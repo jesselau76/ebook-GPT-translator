@@ -1,7 +1,5 @@
 # pdf-epub-GPT-translator
 
-[En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
-
 This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports PDF and EPUB file formats for conversion, and can translate text into a variety of languages.
 
 ## Installation
@@ -52,7 +50,7 @@ The `settings.cfg` file contains several options that can be used to configure t
 ## Output
 
 
-The output of the script will be an EPUB file with the same name as the input file, but with `_translated` appended to the end. For example, if the input file is `example.pdf`, the output file will be `example_translated.epub` and `example_translated.txt`.
+The output of the script will be an EPUB file with the same name as the input file, but with `_translated` appended to the end. For example, if the input file is `example.pdf`, the output file will be `example_translated.epub`.
 
 ## License
 

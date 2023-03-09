@@ -158,6 +158,7 @@ import sys
 filename = sys.argv[1]
 base_filename, file_extension = os.path.splitext(filename)
 new_filename = base_filename + "_translated.epub"
+new_filenametxt = base_filename + "_translated.txt"
 text = ""
 # 根据文件类型调用相应的函数
 if filename.endswith('.pdf'):
@@ -211,4 +212,6 @@ for short_text in tqdm(short_text_list):
 text_to_epub(translated_text, new_filename, language_code)
 
 
-# 打印翻译后的文本
+# 将翻译后的文本同时写入txt文件 incase epub插件出问题
+with open(new_filenametxt, "w", encoding="utf-8") as f:
+    f.write(translated_text)
