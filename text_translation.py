@@ -113,7 +113,7 @@ def translate_text(text):
             messages=[
                 {
                     "role": "user",
-                    # english prompt here to save tokens
+                    
                     "content": f"translate the following text into {language_name}: \n{text}",
                 }
             ],
@@ -126,6 +126,7 @@ def translate_text(text):
             .decode()
         )
     except Exception as e:
+        import time
         # TIME LIMIT for open api please pay
         sleep_time = 60
         time.sleep(sleep_time)
