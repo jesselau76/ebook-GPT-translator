@@ -31,6 +31,12 @@ python3 text_translation.py example.epub
 
 By default, the script will attempt to translate the text into the language specified in the `settings.cfg` file under the `target-language` option. You can also choose to output a bilingual version of the text by setting the `bilingual-output` option to `True`.
 
+## Feature
+- The code reads the OpenAI API key, target language, and other options from a settings.cfg file.
+- The code converts PDF and EPUB files to text using the pdfminer and ebooklib libraries, respectively.
+- The code provides an option to output bilingual text.
+- The code provides a progress bar to show the progress of PDF/EPUB to text conversion and translation
+
 ## Configuration
 
 The `settings.cfg` file contains several options that can be used to configure the behavior of the script:
