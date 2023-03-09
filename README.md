@@ -22,11 +22,11 @@ pip install pdfminer pdfminer.six openai tqdm nltk ebooklib bs4
 To use this tool, simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
 
 ```
-python text_translation.py example.pdf
+python3 text_translation.py example.pdf
 ```
 or to translate a epub file named `example.epub`, you would run the following command:
 ```
-python text_translation.py example.epub
+python3 text_translation.py example.epub
 ```
 
 By default, the script will attempt to translate the text into the language specified in the `settings.cfg` file under the `target-language` option. You can also choose to output a bilingual version of the text by setting the `bilingual-output` option to `True`.
