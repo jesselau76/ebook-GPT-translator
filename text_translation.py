@@ -205,6 +205,13 @@ elif filename.endswith('.epub'):
         for i in range(10):
             text = convert_epub_to_text(filename)
             pbar.update(1)
+elif filename.endswith('.txt'):
+    with tqdm(total=10, desc="Converting txt to text") as pbar:
+        for i in range(10):
+            with open(filename, 'r', encoding='utf-8') as file:
+                text = file.read()
+            pbar.update(1)
+    title = os.path.basename(filename)
 else:
     print("Unsupported file type")
 # 将PDF文件转换为文本
@@ -243,9 +250,11 @@ for short_text in tqdm(short_text_list):
     print(translated_short_text)
     
 # 将翻译后的文本写入epub文件
-text_to_epub(translated_text, new_filename, language_code,title)
+with tqdm(total=10, desc="Writing translated text to epub") as pbar:
+    text_to_epub(translated_text, new_filename, language_code, title)
+    pbar.update(1)
 
 
-# 将翻译后的文本同时写入txt文件 incase epub插件出问题
+# 将翻译后的文本同时写入txt文件 in case epub插件出问题
 with open(new_filenametxt, "w", encoding="utf-8") as f:
     f.write(translated_text)
