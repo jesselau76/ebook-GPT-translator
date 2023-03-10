@@ -19,9 +19,27 @@ You can install these packages by running the following command:
 ```
 pip install pdfminer pdfminer.six openai tqdm nltk ebooklib bs4
 ```
+
+git clone
+
+```
+git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
+```
+
 ## Usage
 
-To use this tool, simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
+To use this tool, you need change setting.cfg at first.
+```
+cd pdf-epub-GPT-translator
+nano settings.cfg
+```
+
+```
+openai-apikey = sk-xxxxxxx
+```
+replace sk-xxxxxxx to your OpenAI api key.
+
+Simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
 
 ```
 python3 text_translation.py example.pdf
