@@ -12,6 +12,37 @@ from ebooklib import epub
 import os
 from bs4 import BeautifulSoup
 import configparser
+from pdfminer.pdfparser import PDFParser
+from pdfminer.pdfdocument import PDFDocument
+import random
+def get_pdf_title(pdf_filename):
+    try:
+        with open(pdf_filename, 'rb') as file:
+            parser = PDFParser(file)
+            document = PDFDocument(parser)
+            if 'Title' in document.info:
+                return document.info['Title']
+            else:
+                text = pdfminer.high_level.extract_text(file)
+                match = re.search(r'(?<=\n)([^\n]+)(?=\n)', text)
+                if match:
+                    return match.group(1)
+                else:
+                    return "Unknown title"
+    except:
+        return "Unknown title"
+
+def get_epub_title(epub_filename):
+    try:
+        book = epub.read_epub(epub_filename)
+        metadata = book.get_metadata('DC', {})
+        if metadata:
+            if 'title' in metadata:
+                return metadata['title'][0]
+        else:
+            return "Unknown title"
+    except:
+       return "Unknown title" 
 
 # 读取option文件
 config = configparser.ConfigParser()
@@ -40,14 +71,14 @@ def convert_epub_to_text(epub_filename):
     # 返回文本
     return text
 
-def text_to_epub(text, filename, language_code='en'):
+def text_to_epub(text, filename, language_code='en',title="Title"):
     text = text.replace("\n", "<br>")
     # 创建epub书籍对象
     book = epub.EpubBook()
 
     # 设置元数据
-    book.set_identifier('id')
-    book.set_title('Title')
+    book.set_identifier(str(random.randint(100000, 999999)))
+    book.set_title(title)
     book.set_language(language_code)
 
     # 创建章节对象
@@ -163,11 +194,13 @@ new_filenametxt = base_filename + "_translated.txt"
 text = ""
 # 根据文件类型调用相应的函数
 if filename.endswith('.pdf'):
+    title = get_pdf_title(filename)
     with tqdm(total=10, desc="Converting PDF to text") as pbar:
         for i in range(10):
             text = convert_pdf_to_text(filename)
             pbar.update(1)
 elif filename.endswith('.epub'):
+    title = get_epub_title(filename)
     with tqdm(total=10, desc="Converting epub to text") as pbar:
         for i in range(10):
             text = convert_epub_to_text(filename)
@@ -202,7 +235,7 @@ for short_text in tqdm(short_text_list):
     short_text = return_text(short_text)
     translated_short_text = return_text(translated_short_text)
     # 将当前短文本和翻译后的文本加入总文本中
-    if bilingual_output == "True":
+    if bilingual_output.lower() == 'true':
         translated_text += f"{short_text}\n{translated_short_text}\n"
     else:
         translated_text += f"{translated_short_text}\n"
@@ -210,7 +243,7 @@ for short_text in tqdm(short_text_list):
     print(translated_short_text)
     
 # 将翻译后的文本写入epub文件
-text_to_epub(translated_text, new_filename, language_code)
+text_to_epub(translated_text, new_filename, language_code,title)
 
 
 # 将翻译后的文本同时写入txt文件 incase epub插件出问题
