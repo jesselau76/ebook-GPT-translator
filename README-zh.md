@@ -29,26 +29,34 @@ git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 ```
 
 ## 用法
+
 使用前更改`settings.cfg` 文件
+
+```
+cd pdf-epub-GPT-translator
+nano settings.cfg
+```
+
 ```
 openai-apikey = sk-xxxxxxx
 ```
+
 将sk-xxxxxxx替换为你的OpenAI api key.
 
-要使用此工具，只需运行“text_translation.py”脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为“example.pdf”的 PDF 文件，您可以运行以下命令：
+运行`text_translation.py`脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为`example.pdf`的 PDF 文件，您可以运行以下命令：
 
 ```
 python3 text_translation.py example.pdf
 ```
-或者要翻译名为 example.epub 的 epub 文件，您可以运行以下命令：
+或者要翻译名为 `example.epub` 的 epub 文件，您可以运行以下命令：
 ```
 python3 text_translation.py example.epub
 ```
-或者要翻译名为 example.txt 的 text 文件，您可以运行以下命令：
+或者要翻译名为 `example.txt` 的 text 文件，您可以运行以下命令：
 ```
 python3 text_translation.py example.txt
 ```
-默认情况下，脚本会尝试将文本翻译成在 `target-language` 选项下的 `settings.cfg` 文件中指定的语言。 您还可以通过将“bilingual-output”选项设置为“True”来选择输出文本的双语版本。
+默认情况下，脚本会尝试将文本翻译成在 `target-language` 选项下的 `settings.cfg` 文件中指定的语言。 您还可以通过将`bilingual-output`选项设置为`True`来选择输出文本的双语版本。
 
 ## 特点
 - 代码从 settings.cfg 文件中读取 OpenAI API 密钥、目标语言和其他选项。
@@ -61,8 +69,9 @@ python3 text_translation.py example.txt
 `settings.cfg` 文件包含几个可用于配置脚本行为的选项：
 
 - `openai-apikey`：您的 OpenAI API 的API Key
-- `target-language`：您要将文本翻译成的语言（例如，`ja` 用于日语，`zh` 用于中文，甚至是“文言文”等）。
-![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
+- `target-language`：您要将文本翻译成的语言（例如，`ja` 用于日语，`zh` 用于中文，也可加入风格描述，如`文言文`、`红楼梦风格的半文言文`等）。
+
+
 - `bilingual-output`：是否输出文本的双语版本。
 - `langcode`：输出 epub 文件的语言代码（例如 `ja` 表示日语，`zh` 表示中文等）。
 
