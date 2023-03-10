@@ -21,7 +21,19 @@
 ```
 pip install pdfminer pdfminer.six openai tqdm nltk ebooklib bs4
 ```
+
+git clone本git
+
+```
+git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
+```
+
 ## 用法
+使用前更改`settings.cfg` 文件
+```
+openai-apikey = sk-xxxxxxx
+```
+将sk-xxxxxxx替换为你的OpenAI api key.
 
 要使用此工具，只需运行“text_translation.py”脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为“example.pdf”的 PDF 文件，您可以运行以下命令：
 
@@ -32,7 +44,10 @@ python3 text_translation.py example.pdf
 ```
 python3 text_translation.py example.epub
 ```
-
+或者要翻译名为 example.txt 的 text 文件，您可以运行以下命令：
+```
+python3 text_translation.py example.txt
+```
 默认情况下，脚本会尝试将文本翻译成在 `target-language` 选项下的 `settings.cfg` 文件中指定的语言。 您还可以通过将“bilingual-output”选项设置为“True”来选择输出文本的双语版本。
 
 ## 特点
