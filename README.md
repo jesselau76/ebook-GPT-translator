@@ -39,6 +39,18 @@ openai-apikey = sk-xxxxxxx
 ```
 replace sk-xxxxxxx to your OpenAI api key.
 
+usage: 
+```
+python3 text_translation.py [-h] [--test] filename
+
+positional arguments:
+  filename    Name of the input file
+
+options:
+  -h, --help  show this help message and exit
+  --test      Only translate the first 3 short texts
+```
+
 Simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
 
 ```
