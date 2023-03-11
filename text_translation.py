@@ -184,13 +184,21 @@ def translate_text(text):
 
     
     
+import argparse
+
+# 创建参数解析器
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", help="Name of the input file")
+parser.add_argument("--test", help="Only translate the first 3 short texts", action="store_true")
+args = parser.parse_args()
 
 # 获取命令行参数
-import sys
-filename = sys.argv[1]
+filename = args.filename
 base_filename, file_extension = os.path.splitext(filename)
 new_filename = base_filename + "_translated.epub"
 new_filenametxt = base_filename + "_translated.txt"
+
+
 text = ""
 # 根据文件类型调用相应的函数
 if filename.endswith('.pdf'):
@@ -230,7 +238,8 @@ text = re.sub(r"\s+", " ", text)
 
 # 将文本分成不大于1024字符的短文本list
 short_text_list = split_text(text)
-
+if args.test:
+    short_text_list = short_text_list[:3]
 # 初始化翻译后的文本
 translated_text = ""
 
