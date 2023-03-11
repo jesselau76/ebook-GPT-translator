@@ -73,6 +73,7 @@ By default, the script will attempt to translate the text into the language spec
 - The code converts PDF and EPUB files to text using the pdfminer and ebooklib libraries, respectively.
 - The code provides an option to output bilingual text.
 - The code provides a progress bar to show the progress of PDF/EPUB to text conversion and translation
+- Test function available. Only translate 3 short texts to save your API usage with --test.
 
 ## Configuration
 
