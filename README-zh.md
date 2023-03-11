@@ -43,6 +43,19 @@ openai-apikey = sk-xxxxxxx
 
 将sk-xxxxxxx替换为你的OpenAI api key.
 
+如果需要先测试prompt,可以加--test参数
+
+```
+python3 text_translation.py [-h] [--test] filename
+
+positional arguments:
+  filename    Name of the input file
+
+options:
+  -h, --help  show this help message and exit
+  --test      Only translate the first 3 short texts
+```
+
 运行`text_translation.py`脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为`example.pdf`的 PDF 文件，您可以运行以下命令：
 
 ```
@@ -63,7 +76,7 @@ python3 text_translation.py example.txt
 - 该代码分别使用 pdfminer 和 ebooklib 库将 PDF 和 EPUB 文件转换为文本。
 - 该代码提供了一个选项来输出双语文本。
 - 代码提供了一个进度条来显示PDF/EPUB到文本转换和翻译的进度
-
+- 测试功能，只翻译前三页以节省API用量。
 ## 配置
 
 `settings.cfg` 文件包含几个可用于配置脚本行为的选项：
