@@ -240,6 +240,10 @@ if filename.endswith('.epub'):
             # 使用BeautifulSoup提取原文本
             soup = BeautifulSoup(item.get_content(), 'html.parser')
             text = soup.get_text().strip()
+            img_html=''
+            img_tags = soup.find_all('img')
+            for img_tag in img_tags:
+                img_html += str(img_tag) + '<br>'
 
             # 如果原文本为空，则跳过
             if not text:
@@ -275,7 +279,7 @@ if filename.endswith('.epub'):
                 #print(short_text)
                 print(translated_short_text)
             # 使用翻译后的文本替换原有的章节内容
-            item.set_content(translated_text.encode('utf-8'))
+            item.set_content((img_html+translated_text).encode('utf-8'))
             translated_all +=translated_text
             if args.test and count >= 3:
                 break
