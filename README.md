@@ -92,3 +92,11 @@ The output of the script will be an EPUB file with the same name as the input fi
 ## License
 
 This tool is released under the MIT License.
+
+## Disclaimer:
+
+The purpose of this project is only applicable to books that have entered the public domain and is not intended for use with copyrighted material. We strongly advise users to read the copyright information carefully before using this project and to comply with relevant laws and regulations in order to protect their own and others' rights.
+
+In no event shall the authors or developers be liable for any loss or damage caused by the use of this project. Users assume all risks associated with the use of this project. Users must confirm that they have obtained permission from the original copyright holder or used open source PDF/EPUB files before using this project to avoid potential copyright risks.
+
+If you have any concerns or suggestions about the use of this project, please contact us through the issues section.
