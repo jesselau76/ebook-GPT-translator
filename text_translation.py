@@ -4,9 +4,9 @@ import pdfminer.high_level
 import re
 import openai
 from tqdm import tqdm
-import nltk
-nltk.download('punkt')
-from nltk.tokenize import sent_tokenize
+# import nltk
+# nltk.download('punkt')
+# from nltk.tokenize import sent_tokenize
 import ebooklib
 from ebooklib import epub
 import os
@@ -109,8 +109,10 @@ def convert_pdf_to_text(pdf_filename):
 
 # 将文本分成不大于1024字符的短文本list
 def split_text(text):
-    # 使用nltk将文本分割为句子
-    sentence_list = sent_tokenize(text)
+    
+    sentence_list = re.findall(r'.+?[。！？!?.]', text)
+    
+
     # 初始化短文本列表
     short_text_list = []
     # 初始化当前短文本
@@ -127,6 +129,12 @@ def split_text(text):
     # 将最后的短文本加入短文本列表
     short_text_list.append(short_text)
     return short_text_list
+
+
+def has_double_byte_chars(text):
+    pattern = re.compile(r'[^\x00-\xff]')
+    match = pattern.search(text)
+    return match is not None
 
 # 将句号替换为句号+回车
 def return_text(text):
@@ -214,16 +222,14 @@ elif filename.endswith('.epub'):
             text = convert_epub_to_text(filename)
             pbar.update(1)
 elif filename.endswith('.txt'):
-    with tqdm(total=10, desc="Converting txt to text") as pbar:
-        for i in range(10):
-            with open(filename, 'r', encoding='utf-8') as file:
-                text = file.read()
-            pbar.update(1)
+    
+    with open(filename, 'r', encoding='utf-8') as file:
+        text = file.read()
+       
+           
     title = os.path.basename(filename)
 else:
     print("Unsupported file type")
-# 将PDF文件转换为文本
-
 
 
 # 将所有回车替换为空格
