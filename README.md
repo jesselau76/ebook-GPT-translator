@@ -11,13 +11,12 @@ To use this tool, you will need to have Python 3 installed on your system, as we
 - pdfminer
 - openai
 - tqdm
-- nltk
 - ebooklib
 - bs4
 
 You can install these packages by running the following command:
 ```
-pip install pdfminer pdfminer.six openai tqdm nltk ebooklib bs4
+pip install pdfminer pdfminer.six openai tqdm ebooklib bs4
 ```
 
 git clone
