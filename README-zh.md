@@ -29,10 +29,10 @@ git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 
 ## 用法
 
-使用前更改`settings.cfg` 文件
-
+使用前将settings.cfg.example改名为settings.cfg并编辑.
 ```
 cd pdf-epub-GPT-translator
+mv settings.cfg.example settings.cfg
 nano settings.cfg
 ```
 
