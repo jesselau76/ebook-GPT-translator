@@ -13,13 +13,12 @@
 - pdfminer
 - openai
 - tqdm
-- nltk
 - ebooklib
 - bs4
 
 您可以通过运行以下命令来安装这些软件包：
 ```
-pip install pdfminer pdfminer.six openai tqdm nltk ebooklib bs4
+pip install pdfminer pdfminer.six openai tqdm ebooklib bs4
 ```
 
 git clone本git
