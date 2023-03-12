@@ -26,7 +26,11 @@ git clone本git
 ```
 git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 ```
-
+升级到新版
+```
+cd pdf-epub-GPT-translator
+git pull
+```
 ## 用法
 
 使用前将settings.cfg.example改名为settings.cfg并编辑.
