@@ -27,9 +27,10 @@ git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 
 ## Usage
 
-To use this tool, you need change setting.cfg at first.
+To use this tool, you need rename settings.cfg.example to settings.cfg at first.
 ```
 cd pdf-epub-GPT-translator
+mv settings.cfg.example settings.cfg
 nano settings.cfg
 ```
 
