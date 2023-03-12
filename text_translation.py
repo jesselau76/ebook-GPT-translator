@@ -216,11 +216,7 @@ if filename.endswith('.pdf'):
             text = convert_pdf_to_text(filename)
             pbar.update(1)
 elif filename.endswith('.epub'):
-    title = get_epub_title(filename)
-    with tqdm(total=10, desc="Converting epub to text") as pbar:
-        for i in range(10):
-            text = convert_epub_to_text(filename)
-            pbar.update(1)
+    book = epub.read_epub(filename)
 elif filename.endswith('.txt'):
     
     with open(filename, 'r', encoding='utf-8') as file:
@@ -231,45 +227,104 @@ elif filename.endswith('.txt'):
 else:
     print("Unsupported file type")
 
+if filename.endswith('.epub'):
+    # 获取所有章节
+    items = book.get_items()
 
-# 将所有回车替换为空格
-text = text.replace("\n", " ")
+    # 遍历所有章节
+    translated_all=''
+    count = 0
+    for item in tqdm(items):
+        # 如果章节类型为文档类型，则需要翻译
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            # 使用BeautifulSoup提取原文本
+            soup = BeautifulSoup(item.get_content(), 'html.parser')
+            text = soup.get_text().strip()
 
-# 将多个空格替换为一个空格
-import re
-text = re.sub(r"\s+", " ", text)
+            # 如果原文本为空，则跳过
+            if not text:
+                continue
+        # 将所有回车替换为空格
+            text = text.replace("\n", " ")
+
+            # 将多个空格替换为一个空格
+            import re
+            text = re.sub(r"\s+", " ", text)
+
+            # 将文本分成不大于1024字符的短文本list
+            short_text_list = split_text(text)
+            if args.test:
+                short_text_list = short_text_list[:3]
+
+            # 初始化翻译后的文本
+            translated_text = ""
+
+            # 遍历短文本列表，依次翻译每个短文本
+            for short_text in tqdm(short_text_list):
+                print(return_text(short_text))
+                count +=1
+                # 翻译当前短文本
+                translated_short_text = translate_text(short_text)
+                short_text = return_text(short_text)
+                translated_short_text = return_text(translated_short_text)
+                # 将当前短文本和翻译后的文本加入总文本中
+                if bilingual_output.lower() == 'true':
+                    translated_text += f"{short_text}<br>\n{translated_short_text}<br>\n"
+                else:
+                    translated_text += f"{translated_short_text}<br>\n"
+                #print(short_text)
+                print(translated_short_text)
+            # 使用翻译后的文本替换原有的章节内容
+            item.set_content(translated_text.encode('utf-8'))
+            translated_all +=translated_text
+            if args.test and count >= 3:
+                break
+
+    # 将epub书籍写入文件
+    epub.write_epub(new_filename, book, {})
+    # 将翻译后的文本同时写入txt文件 in case epub插件出问题
+    with open(new_filenametxt, "w", encoding="utf-8") as f:
+        f.write(translated_all)
+
+else:
+    # 将所有回车替换为空格
+    text = text.replace("\n", " ")
+
+    # 将多个空格替换为一个空格
+    import re
+    text = re.sub(r"\s+", " ", text)
 
 
 
 
-# 将文本分成不大于1024字符的短文本list
-short_text_list = split_text(text)
-if args.test:
-    short_text_list = short_text_list[:3]
-# 初始化翻译后的文本
-translated_text = ""
+    # 将文本分成不大于1024字符的短文本list
+    short_text_list = split_text(text)
+    if args.test:
+        short_text_list = short_text_list[:3]
+    # 初始化翻译后的文本
+    translated_text = ""
 
-# 遍历短文本列表，依次翻译每个短文本
-for short_text in tqdm(short_text_list):
-    print(return_text(short_text))
-    # 翻译当前短文本
-    translated_short_text = translate_text(short_text)
-    short_text = return_text(short_text)
-    translated_short_text = return_text(translated_short_text)
-    # 将当前短文本和翻译后的文本加入总文本中
-    if bilingual_output.lower() == 'true':
-        translated_text += f"{short_text}\n{translated_short_text}\n"
-    else:
-        translated_text += f"{translated_short_text}\n"
-    #print(short_text)
-    print(translated_short_text)
-    
-# 将翻译后的文本写入epub文件
-with tqdm(total=10, desc="Writing translated text to epub") as pbar:
-    text_to_epub(translated_text, new_filename, language_code, title)
-    pbar.update(1)
+    # 遍历短文本列表，依次翻译每个短文本
+    for short_text in tqdm(short_text_list):
+        print(return_text(short_text))
+        # 翻译当前短文本
+        translated_short_text = translate_text(short_text)
+        short_text = return_text(short_text)
+        translated_short_text = return_text(translated_short_text)
+        # 将当前短文本和翻译后的文本加入总文本中
+        if bilingual_output.lower() == 'true':
+            translated_text += f"{short_text}\n{translated_short_text}\n"
+        else:
+            translated_text += f"{translated_short_text}\n"
+        #print(short_text)
+        print(translated_short_text)
+        
+    # 将翻译后的文本写入epub文件
+    with tqdm(total=10, desc="Writing translated text to epub") as pbar:
+        text_to_epub(translated_text, new_filename, language_code, title)
+        pbar.update(1)
 
 
-# 将翻译后的文本同时写入txt文件 in case epub插件出问题
-with open(new_filenametxt, "w", encoding="utf-8") as f:
-    f.write(translated_text)
+    # 将翻译后的文本同时写入txt文件 in case epub插件出问题
+    with open(new_filenametxt, "w", encoding="utf-8") as f:
+        f.write(translated_text)
