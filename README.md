@@ -25,6 +25,11 @@ git clone
 git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 ```
 
+Update to new version
+```
+cd pdf-epub-GPT-translator
+git pull
+```
 ## Usage
 
 To use this tool, you need rename settings.cfg.example to settings.cfg at first.
