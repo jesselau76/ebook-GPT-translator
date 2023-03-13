@@ -1,5 +1,4 @@
-# pdf-epub-GPT-translator
-
+# pdf-epub-GPT-translator: Enjoy reading with your favorite style.
 [En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
 
 This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports PDF and EPUB file formats for conversion, and can translate text into a variety of languages.
