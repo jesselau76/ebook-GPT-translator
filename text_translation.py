@@ -45,8 +45,16 @@ def get_epub_title(epub_filename):
        return "Unknown title" 
 
 # 读取option文件
-config = configparser.ConfigParser()
-config.read('settings.cfg')
+import chardet
+
+with open('settings.cfg', 'rb') as f:
+    content = f.read()
+    encoding = chardet.detect(content)['encoding']
+    
+with open('settings.cfg', encoding=encoding) as f:
+    config_text = f.read()
+    config = configparser.ConfigParser()
+    config.read_string(config_text)
 
 # 获取openai_apikey和language
 openai_apikey = config.get('option', 'openai-apikey')
