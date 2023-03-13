@@ -86,7 +86,7 @@ python3 text_translation.py example.txt
 
 - `openai-apikey`：您的 OpenAI API 的API Key
 - `target-language`：您要将文本翻译成的语言（例如，`ja` 用于日语，`zh` 用于中文，也可加入风格描述，如`文言文`、`红楼梦风格的半文言文`等）。
-
+![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
 
 - `bilingual-output`：是否输出文本的双语版本。
 - `langcode`：输出 epub 文件的语言代码（例如 `ja` 表示日语，`zh` 表示中文等）。
