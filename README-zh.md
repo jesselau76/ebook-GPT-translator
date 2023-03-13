@@ -1,4 +1,4 @@
-# pdf-epub-GPT-翻译器
+# pdf-epub-GPT-翻译器: : Enjoy reading with your favorite style.
 
 [En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
 
