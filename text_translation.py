@@ -365,3 +365,8 @@ else:
     with open(new_filenametxt, "w", encoding="utf-8") as f:
         f.write(translated_text)
 
+try:
+    os.remove(jsonfile)
+    print(f"File '{jsonfile}' has been deleted.")
+except FileNotFoundError:
+    print(f"File '{jsonfile}' not found. No file was deleted.")
