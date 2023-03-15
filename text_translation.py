@@ -15,6 +15,8 @@ import configparser
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 import random
+import json
+
 def get_pdf_title(pdf_filename):
     try:
         with open(pdf_filename, 'rb') as file:
@@ -63,6 +65,27 @@ bilingual_output = config.get('option', 'bilingual-output')
 language_code = config.get('option', 'langcode')
 # 设置openai的API密钥
 openai.api_key = openai_apikey
+import argparse
+
+# 创建参数解析器
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", help="Name of the input file")
+parser.add_argument("--test", help="Only translate the first 3 short texts", action="store_true")
+args = parser.parse_args()
+
+# 获取命令行参数
+filename = args.filename
+base_filename, file_extension = os.path.splitext(filename)
+new_filename = base_filename + "_translated.epub"
+new_filenametxt = base_filename + "_translated.txt"
+jsonfile = base_filename + "_process.json"
+# 从文件中加载已经翻译的文本
+translated_dict = {}
+try:
+    with open(jsonfile, "r", encoding="utf-8") as f:
+        translated_dict = json.load(f)
+except FileNotFoundError:
+    pass
 
 def convert_epub_to_text(epub_filename):
     # 打开epub文件
@@ -139,10 +162,7 @@ def split_text(text):
     return short_text_list
 
 
-def has_double_byte_chars(text):
-    pattern = re.compile(r'[^\x00-\xff]')
-    match = pattern.search(text)
-    return match is not None
+
 
 # 将句号替换为句号+回车
 def return_text(text):
@@ -199,23 +219,26 @@ def translate_text(text):
     return t_text
 
     
+def translate_and_store(text):
     
-import argparse
 
-# 创建参数解析器
-parser = argparse.ArgumentParser()
-parser.add_argument("filename", help="Name of the input file")
-parser.add_argument("--test", help="Only translate the first 3 short texts", action="store_true")
-args = parser.parse_args()
+    # 如果文本已经翻译过，直接返回翻译结果
+    if text in translated_dict:
+        return translated_dict[text]
 
-# 获取命令行参数
-filename = args.filename
-base_filename, file_extension = os.path.splitext(filename)
-new_filename = base_filename + "_translated.epub"
-new_filenametxt = base_filename + "_translated.txt"
+    # 否则，调用 translate_text 函数进行翻译，并将结果存储在字典中
+    translated_text = translate_text(text)
+    translated_dict[text] = translated_text
+
+    # 将字典保存为 JSON 文件
+    with open(jsonfile, "w", encoding="utf-8") as f:
+        json.dump(translated_dict, f, ensure_ascii=False, indent=4)
+
+    return translated_text 
 
 
 text = ""
+
 # 根据文件类型调用相应的函数
 if filename.endswith('.pdf'):
     title = get_pdf_title(filename)
@@ -271,12 +294,13 @@ if filename.endswith('.epub'):
             # 初始化翻译后的文本
             translated_text = ""
 
+
             # 遍历短文本列表，依次翻译每个短文本
             for short_text in tqdm(short_text_list):
                 print(return_text(short_text))
                 count +=1
                 # 翻译当前短文本
-                translated_short_text = translate_text(short_text)
+                translated_short_text = translate_and_store(short_text)
                 short_text = return_text(short_text)
                 translated_short_text = return_text(translated_short_text)
                 # 将当前短文本和翻译后的文本加入总文本中
@@ -320,7 +344,7 @@ else:
     for short_text in tqdm(short_text_list):
         print(return_text(short_text))
         # 翻译当前短文本
-        translated_short_text = translate_text(short_text)
+        translated_short_text = translate_and_store(short_text)
         short_text = return_text(short_text)
         translated_short_text = return_text(translated_short_text)
         # 将当前短文本和翻译后的文本加入总文本中
@@ -340,3 +364,4 @@ else:
     # 将翻译后的文本同时写入txt文件 in case epub插件出问题
     with open(new_filenametxt, "w", encoding="utf-8") as f:
         f.write(translated_text)
+
