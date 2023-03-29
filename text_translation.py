@@ -12,10 +12,36 @@ from ebooklib import epub
 import os
 from bs4 import BeautifulSoup
 import configparser
-from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
+from pdfminer.pdfparser import PDFParser
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+from io import StringIO
 import random
 import json
+import docx
+import zipfile
+from lxml import etree
+from docx import Document
+
+
+def get_docx_title(docx_filename):
+    with zipfile.ZipFile(docx_filename) as zf:
+        core_properties = etree.fromstring(zf.read("docProps/core.xml"))
+
+    ns = {"cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+          "dc": "http://purl.org/dc/elements/1.1/",
+          "dcterms": "http://purl.org/dc/terms/",
+          "dcmitype": "http://purl.org/dc/dcmitype/",
+          "xsi": "http://www.w3.org/2001/XMLSchema-instance"}
+
+    title_elements = core_properties.findall("dc:title", ns)
+    if title_elements:
+        return title_elements[0].text
+    else:
+        return "Unknown title"
 
 def get_pdf_title(pdf_filename):
     try:
@@ -63,6 +89,9 @@ openai_apikey = config.get('option', 'openai-apikey')
 language_name = config.get('option', 'target-language')
 bilingual_output = config.get('option', 'bilingual-output')
 language_code = config.get('option', 'langcode')
+# Get startpage and endpage as integers with default values
+startpage = config.getint('option', 'startpage', fallback=1)
+endpage = config.getint('option', 'endpage', fallback=-1)
 # 设置openai的API密钥
 openai.api_key = openai_apikey
 import argparse
@@ -86,6 +115,16 @@ try:
         translated_dict = json.load(f)
 except FileNotFoundError:
     pass
+
+
+def convert_docx_to_text(docx_filename):
+    doc = docx.Document(docx_filename)
+
+    text = ""
+    for paragraph in doc.paragraphs:
+        text += paragraph.text + "\n"
+
+    return text
 
 def convert_epub_to_text(epub_filename):
     # 打开epub文件
@@ -133,10 +172,22 @@ def text_to_epub(text, filename, language_code='en',title="Title"):
     # 将书籍写入文件
     epub.write_epub(filename, book, {})
 # 将PDF文件转换为文本
-def convert_pdf_to_text(pdf_filename):
+# For PDF files
+def get_total_pages(pdf_filename):
     with open(pdf_filename, 'rb') as file:
-        text = pdfminer.high_level.extract_text(file)
-        return text
+        parser = PDFParser(file)
+        document = PDFDocument(parser)
+        return len(list(PDFPage.create_pages(document)))
+def convert_pdf_to_text(pdf_filename, start_page=1, end_page=-1):
+    if end_page == -1:
+        end_page = get_total_pages(pdf_filename)
+        # print("Total pages of the file:"+ str(end_page))
+        # print("Converting PDF from:"+ str(start_page)+" to "+ str(end_page) + " page")
+        text = pdfminer.high_level.extract_text(pdf_filename, page_numbers=list(range(start_page-1, end_page)))
+    else:
+        # print("Converting PDF from:"+ str(start_page)+" to "+ str(end_page) + " page")
+        text = pdfminer.high_level.extract_text(pdf_filename, page_numbers=list(range(start_page-1, end_page)))
+    return text
 
 # 将文本分成不大于1024字符的短文本list
 def split_text(text):
@@ -241,12 +292,14 @@ text = ""
 
 # 根据文件类型调用相应的函数
 if filename.endswith('.pdf'):
+    print("Converting PDF to text")
     title = get_pdf_title(filename)
     with tqdm(total=10, desc="Converting PDF to text") as pbar:
         for i in range(10):
-            text = convert_pdf_to_text(filename)
+            text = convert_pdf_to_text(filename,startpage,endpage)
             pbar.update(1)
 elif filename.endswith('.epub'):
+    print("Converting epub to text")
     book = epub.read_epub(filename)
 elif filename.endswith('.txt'):
     
@@ -255,6 +308,13 @@ elif filename.endswith('.txt'):
        
            
     title = os.path.basename(filename)
+elif filename.endswith('.docx'):
+    print("Converting DOCX file to text")
+    title = get_docx_title(filename)
+    with tqdm(total=10, desc="Converting DOCX to text") as pbar:
+        for i in range(10):
+            text = convert_docx_to_text(filename)
+            pbar.update(1)
 else:
     print("Unsupported file type")
 

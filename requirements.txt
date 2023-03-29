@@ -1,0 +1,7 @@
+pdfminer 
+pdfminer.six 
+openai 
+tqdm 
+ebooklib 
+bs4
+python-docx

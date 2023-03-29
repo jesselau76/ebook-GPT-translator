@@ -1,9 +1,18 @@
 [option]
 #API key for OpenAI API
 openai-apikey = sk-
+
 #Target language for translation, e.g. "en", "zh-cn", "ja",or "繁体中文","文言文"
-target-language = 红楼梦风格的半文言文
+target-language = 金庸风格的白话文
+
 #Whether to output bilingual text or just translated text, set to "True" or "False"
 bilingual-output = True
+
 #Language code of the output epub file, e.g. "en", "zh-cn", "ja"
 langcode = zh
+
+#Translation begins from the specified start page number and is exclusively available for PDF files.
+startpage = 1
+
+#Translation will continue until the specified page number in a PDF file. This feature supports PDF files exclusively. If the input is equal to -1, the translation will proceed until the end of the file.
+endpage = -1
