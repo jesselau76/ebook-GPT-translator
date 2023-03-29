@@ -1,6 +1,6 @@
-# pdf-epub-GPT-翻译器: : Enjoy reading with your favorite style.
+# ebook-GPT-翻译器: : Enjoy reading with your favorite style.
 
-[En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
+[En](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README-zh.md)
 
 该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF、DOCX和EPUB文件格式转换翻译成EPUB文件及文本文件，可以将文字翻译成多种语言。
 
