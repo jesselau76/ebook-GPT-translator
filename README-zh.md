@@ -1,13 +1,13 @@
-# ebook-GPT-翻译器: : Enjoy reading with your favorite style.
+# ebook-GPT-Translator: : Enjoy reading with your favorite style.
 
 [En](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README-zh.md)
 
-该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF、DOCX和EPUB文件格式转换翻译成EPUB文件及文本文件，可以将文字翻译成多种语言。
+该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF、DOCX、MOBI和EPUB文件格式转换翻译成EPUB文件及文本文件，可以将文字翻译成多种语言。
 
 注：
-- PDF、DOCX文件只处理其中文本部分，图形部分不会出现在结果文件中。
+- PDF、DOCX及MOBI文件只处理其中文本部分，图形部分不会出现在结果文件中。
 - EPUB文件的图形部分全部放在每章之初，因EPUB文件为HTML语言格式，若保持原有格式需要大量拆分文字，以多段文字一并翻译保持翻译水准为原则，故图形部分不保持在原有位置，而全部放在每章最初。
-- 初始页面、最终页面设置仅支持PDF文件。因EPUB、DOCX、TXT文件等因字体大小，页面大小会有不同，无法处理。
+- 初始页面、最终页面设置仅支持PDF文件。因EPUB、DOCX、MOBI及TXT文件等因字体大小，页面大小会有不同，无法处理页码。
 
 
 你需要申请OpenAI API KEY,[申请地址](https://platform.openai.com/)，现有免费使用额度，3个月有效。
@@ -22,6 +22,7 @@
 - ebooklib
 - bs4
 - docx
+- mobi
 
 您可以通过运行以下命令来安装这些软件包：
 ```
@@ -41,19 +42,19 @@ pip install -r requirements.txt
 ```
 ## 用法
 
-使用前将settings.cfg.example改名为settings.cfg并编辑.
+使用前将settings.cfg.example改名为settings.cfg并用任何一款编辑器编辑.
 ```
 cd ebook-GPT-translator
 mv settings.cfg.example settings.cfg
 nano settings.cfg
 ```
-
+打开settings.cfg文件后
 ```
 openai-apikey = sk-xxxxxxx
 ```
 
 将sk-xxxxxxx替换为你的OpenAI api key.
-修改其他选项，然后按CTRL-X退出保存
+修改其他选项，然后退出保存
 
 如果需要先测试prompt,可以加--test参数只翻译前三段短文字。
 运行命令：
@@ -84,6 +85,11 @@ python3 text_translation.py example.epub
 python3 text_translation.py example.docx
 ```
 
+或者要翻译名为 `example.mobi` 的 mobi 文件，您可以运行以下命令：
+
+```
+python3 text_translation.py example.mobi
+```
 或者要翻译名为 `example.txt` 的 text 文件，您可以运行以下命令：
 ```
 python3 text_translation.py example.txt
@@ -120,8 +126,8 @@ python3 text_translation.py example.txt
 
 ## 免责声明：
 
-本项目仅适用于进入公共领域的图书，不适用于受版权保护的材料。强烈建议用户在使用本项目前仔细阅读版权信息，并遵守相关法律法规以保护自己和他人的权利。
+本项目仅适用于已进入公共领域的书籍和资料。它不适用于受版权保护的内容。在使用本项目之前，我们强烈建议用户仔细查阅版权信息，并遵守相关法律法规，以保护自己和他人的权益。
 
-作者或开发人员不承担因使用本项目而导致的任何损失或损害的责任。用户承担使用本项目所涉及的所有风险。用户必须确认在使用本项目之前已经获得了原始版权持有人的许可或使用了开源PDF/EPUB文件，以避免潜在的版权风险。
+对于因使用本项目而造成的任何损失或损害，本项目的作者和开发者概不负责。用户需承担与本项目使用相关的所有风险。在使用本项目之前，用户有责任确保已获得原版权持有者的许可，或使用开源 PDF、EPUB 或 MOBI 文件，以避免潜在的版权风险。
 
-如果您对使用本项目有任何疑虑或建议，请通过问题部分与我们联系。
+如果您对本项目的使用有任何疑虑或建议，请通过问题（issues）部分与我们联系。

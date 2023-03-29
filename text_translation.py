@@ -10,6 +10,8 @@ from tqdm import tqdm
 import ebooklib
 from ebooklib import epub
 import os
+import tempfile
+import shutil
 from bs4 import BeautifulSoup
 import configparser
 from pdfminer.pdfdocument import PDFDocument
@@ -25,6 +27,7 @@ import docx
 import zipfile
 from lxml import etree
 from docx import Document
+import mobi
 
 
 def get_docx_title(docx_filename):
@@ -59,6 +62,41 @@ def get_pdf_title(pdf_filename):
                     return "Unknown title"
     except:
         return "Unknown title"
+
+
+def get_mobi_title(mobi_filename):
+    try:
+        metadata = mobi.read_metadata(mobi_filename)
+        title = metadata.get("Title", None)
+    except:
+        return "Unknown title"
+
+
+def convert_mobi_to_text(mobi_filename):
+    # Extract MOBI contents to a temporary directory
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir, filepath = mobi.extract(mobi_filename)
+
+        # Find the HTML file in the temporary directory
+        for root, _, files in os.walk(tempdir):
+            for file in files:
+                if file.endswith(".html"):
+                    html_file = os.path.join(root, file)
+                    break
+            else:
+                continue
+            break
+        else:
+            raise FileNotFoundError("HTML file not found in the extracted MOBI contents")
+
+        # Parse the HTML file with BeautifulSoup to get the text
+        with open(html_file, "r", encoding="utf-8") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
+            text = soup.get_text()
+
+    return text
+
+
 
 def get_epub_title(epub_filename):
     try:
@@ -314,6 +352,14 @@ elif filename.endswith('.docx'):
     with tqdm(total=10, desc="Converting DOCX to text") as pbar:
         for i in range(10):
             text = convert_docx_to_text(filename)
+            pbar.update(1)
+
+elif filename.endswith('.mobi'):
+    print("Converting MOBI file to text")
+    title = get_mobi_title(filename)
+    with tqdm(total=10, desc="Converting MOBI to text") as pbar:
+        for i in range(10):
+            text = convert_mobi_to_text(filename)
             pbar.update(1)
 else:
     print("Unsupported file type")

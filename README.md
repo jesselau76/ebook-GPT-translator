@@ -1,13 +1,13 @@
 # ebook-GPT-translator: Enjoy reading with your favorite style.
 [En](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README-zh.md)
 
-This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports converting and translating PDF, DOCX, and EPUB file formats into EPUB and text files and can translate text into multiple languages.
+This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports converting and translating PDF, DOCX, EPUB, and MOBI file formats into EPUB and text files and can translate text into multiple languages.
 
 Notes:
 
-- For PDF and DOCX files, only the text portions will be processed, and graphical elements will not appear in the resulting files.
+- For  PDF, DOCX, and MOBI files, only the text portions will be processed, and graphical elements will not appear in the resulting files.
 - For EPUB files, all graphical elements will be placed at the beginning of each chapter, as EPUB files use HTML language format. To maintain translation quality, the text will be translated in multiple segments without preserving the original formatting, so graphical elements will not be kept in their original positions but will be placed at the beginning of each chapter.
-- The startpage and endpage settings are only supported for PDF files. This is because the font size and page size may vary in EPUB, DOCX, and TXT files, making it difficult to process.
+- The startpage and endpage settings are only supported for PDF files. This is because the font size and page size may vary in EPUB, DOCX, MOBI,and TXT files, making it difficult to process.
 
 ## Installation
 
@@ -19,6 +19,7 @@ To use this tool, you will need to have Python 3 installed on your system, as we
 - ebooklib
 - bs4
 - docx
+- mobi
 
 You can install these packages by running the following command:
 ```
@@ -84,6 +85,10 @@ or to translate a text file named `example.txt`, you would run the following com
 python3 text_translation.py example.txt
 ```
 
+to translate a MOBI file named example.mobi, you would run the following command:
+```
+python3 text_translation.py example.mobi
+```
 By default, the script will attempt to translate the text into the language specified in the `settings.cfg` file under the `target-language` option. You can also choose to output a bilingual version of the text by setting the `bilingual-output` option to `True`.
 
 ## Feature
@@ -117,8 +122,8 @@ This tool is released under the MIT License.
 
 ## Disclaimer:
 
-The purpose of this project is only applicable to books that have entered the public domain and is not intended for use with copyrighted material. We strongly advise users to read the copyright information carefully before using this project and to comply with relevant laws and regulations in order to protect their own and others' rights.
+This project is intended for use with public domain books and materials only. It is not designed for use with copyrighted content. Users are strongly advised to carefully review copyright information before utilizing this project and to adhere to relevant laws and regulations in order to protect their own rights and the rights of others.
 
-In no event shall the authors or developers be liable for any loss or damage caused by the use of this project. Users assume all risks associated with the use of this project. Users must confirm that they have obtained permission from the original copyright holder or used open source PDF/EPUB files before using this project to avoid potential copyright risks.
+The authors and developers of this project shall not be held responsible for any loss or damage resulting from the use of this project. Users assume all risks associated with its use. It is the responsibility of users to ensure they have obtained permission from the original copyright holder or used open-source PDF, EPUB, or MOBI files before employing this project to avoid potential copyright risks.
 
 If you have any concerns or suggestions about the use of this project, please contact us through the issues section.
