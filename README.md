@@ -1,7 +1,7 @@
 # pdf-epub-GPT-translator: Enjoy reading with your favorite style.
 [En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
 
-This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports PDF and EPUB file formats for conversion, and can translate text into a variety of languages.
+This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports PDF, DOCX and EPUB file formats for conversion, and can translate text into a variety of languages.
 
 ## Installation
 
@@ -12,10 +12,11 @@ To use this tool, you will need to have Python 3 installed on your system, as we
 - tqdm
 - ebooklib
 - bs4
+- docx
 
 You can install these packages by running the following command:
 ```
-pip install pdfminer pdfminer.six openai tqdm ebooklib bs4
+pip install -r requirements.txt
 ```
 
 git clone
@@ -28,6 +29,7 @@ Update to new version
 ```
 cd pdf-epub-GPT-translator
 git pull
+pip install -r requirements.txt
 ```
 ## Usage
 
@@ -42,8 +44,9 @@ nano settings.cfg
 openai-apikey = sk-xxxxxxx
 ```
 replace sk-xxxxxxx to your OpenAI api key.
+Change others options then press CTRL-X to save.
 
-usage: 
+run the command: 
 ```
 python3 text_translation.py [-h] [--test] filename
 
@@ -65,6 +68,11 @@ or to translate a epub file named `example.epub`, you would run the following co
 python3 text_translation.py example.epub
 ```
 
+or to translate a docx file named `example.docx`, you would run the following command:
+```
+python3 text_translation.py example.docx
+```
+
 or to translate a text file named `example.txt`, you would run the following command:
 ```
 python3 text_translation.py example.txt
@@ -74,7 +82,7 @@ By default, the script will attempt to translate the text into the language spec
 
 ## Feature
 - The code reads the OpenAI API key, target language, and other options from a settings.cfg file.
-- The code converts PDF and EPUB files to text using the pdfminer and ebooklib libraries, respectively.
+- The code converts PDF, DOCX and EPUB files to text using the pdfminer and ebooklib libraries, respectively.
 - The code provides an option to output bilingual text.
 - The code provides a progress bar to show the progress of PDF/EPUB to text conversion and translation
 - Test function available. Only translate 3 short texts to save your API usage with --test.
@@ -88,6 +96,9 @@ The `settings.cfg` file contains several options that can be used to configure t
 ![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
 - `bilingual-output`: Whether or not to output a bilingual version of the text.
 - `langcode`: The language code for the output epub file (e.g. `ja` for Japanese, `zh` for Chinese, etc.).
+- `startpage`: Translation begins from the specified start page number and is exclusively available for PDF files.
+- `endpage`: Translation will continue until the specified page number in a PDF file. This feature supports PDF files exclusively. If the input is equal to -1, the translation will proceed until the end of the file.
+
 
 ## Output
 
