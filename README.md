@@ -28,12 +28,12 @@ pip install -r requirements.txt
 git clone
 
 ```
-git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
+git clone https://github.com/jesselau76/ebook-GPT-translator.git
 ```
 
 Update to new version
 ```
-cd pdf-epub-GPT-translator
+cd ebook-GPT-translator
 git pull
 pip install -r requirements.txt
 ```
@@ -41,7 +41,7 @@ pip install -r requirements.txt
 
 To use this tool, you need rename settings.cfg.example to settings.cfg at first.
 ```
-cd pdf-epub-GPT-translator
+cd ebook-GPT-translator
 mv settings.cfg.example settings.cfg
 nano settings.cfg
 ```
