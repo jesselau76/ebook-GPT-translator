@@ -2,9 +2,15 @@
 
 [En](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/pdf-epub-GPT-translator/blob/main/README-zh.md)
 
-该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF和EPUB文件格式的转换，可以将文字翻译成多种语言。
+该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF、DOCX和EPUB文件格式转换翻译成EPUB文件及文本文件，可以将文字翻译成多种语言。
 
-你需要申请OpenAI API KEY,[申请地址](https://platform.openai.com/)
+注：
+- PDF、DOCX文件只处理其中文本部分，图形部分不会出现在结果文件中。
+- EPUB文件的图形部分全部放在每章之初，因EPUB文件为HTML语言格式，若保持原有格式需要大量拆分文字，以多段文字一并翻译保持翻译水准为原则，故图形部分不保持在原有位置，而全部放在每章最初。
+- 初始页面、最终页面设置仅支持PDF文件。因EPUB、DOCX、TXT文件等因字体大小，页面大小会有不同，无法处理。
+
+
+你需要申请OpenAI API KEY,[申请地址](https://platform.openai.com/)，现有免费使用额度，3个月有效。
 
 ## 安装
 
@@ -15,10 +21,11 @@
 - tqdm
 - ebooklib
 - bs4
+- docx
 
 您可以通过运行以下命令来安装这些软件包：
 ```
-pip install pdfminer pdfminer.six openai tqdm ebooklib bs4
+pip install -r requirements.txt
 ```
 
 git clone本git
@@ -30,6 +37,7 @@ git clone https://github.com/jesselau76/pdf-epub-GPT-translator.git
 ```
 cd pdf-epub-GPT-translator
 git pull
+pip install -r requirements.txt
 ```
 ## 用法
 
@@ -45,8 +53,10 @@ openai-apikey = sk-xxxxxxx
 ```
 
 将sk-xxxxxxx替换为你的OpenAI api key.
+修改其他选项，然后按CTRL-X退出保存
 
-如果需要先测试prompt,可以加--test参数
+如果需要先测试prompt,可以加--test参数只翻译前三段短文字。
+运行命令：
 
 ```
 python3 text_translation.py [-h] [--test] filename
@@ -68,6 +78,12 @@ python3 text_translation.py example.pdf
 ```
 python3 text_translation.py example.epub
 ```
+
+或者要翻译名为 `example.docx` 的 docx 文件，您可以运行以下命令：
+```
+python3 text_translation.py example.docx
+```
+
 或者要翻译名为 `example.txt` 的 text 文件，您可以运行以下命令：
 ```
 python3 text_translation.py example.txt
@@ -76,7 +92,7 @@ python3 text_translation.py example.txt
 
 ## 特点
 - 代码从 settings.cfg 文件中读取 OpenAI API 密钥、目标语言和其他选项。
-- 该代码分别使用 pdfminer 和 ebooklib 库将 PDF 和 EPUB 文件转换为文本。
+- 该代码分别使用 pdfminer 和 ebooklib 库将 PDF、DOCX 和 EPUB 文件转换为文本。
 - 该代码提供了一个选项来输出双语文本。
 - 代码提供了一个进度条来显示PDF/EPUB到文本转换和翻译的进度
 - 测试功能，只翻译前三页以节省API用量。
@@ -90,6 +106,8 @@ python3 text_translation.py example.txt
 
 - `bilingual-output`：是否输出文本的双语版本。
 - `langcode`：输出 epub 文件的语言代码（例如 `ja` 表示日语，`zh` 表示中文等）。
+- `startpage`: 从指定的起始页码开始翻译，且仅适用于PDF文件。
+- `endpage`: 翻译将持续到PDF文件中指定的页码。此功能仅支持PDF文件。如果输入等于-1，则翻译将继续到文件结束。
 
 ## 输出
 
