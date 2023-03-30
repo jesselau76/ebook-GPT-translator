@@ -6,3 +6,4 @@ ebooklib
 bs4
 python-docx
 mobi
+chardet
