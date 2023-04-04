@@ -427,7 +427,7 @@ if filename.endswith('.epub'):
                 #print(short_text)
                 print(translated_short_text)
             # 使用翻译后的文本替换原有的章节内容
-            item.set_content((img_html+translated_text).encode('utf-8'))
+            item.set_content((img_html+translated_text.replace('\n','<br>')).encode('utf-8'))
             translated_all +=translated_text
             if args.test and count >= 3:
                 break
@@ -473,15 +473,15 @@ else:
         
     # 将翻译后的文本写入epub文件
     with tqdm(total=10, desc="Writing translated text to epub") as pbar:
-        text_to_epub(translated_text, new_filename, language_code, title)
+        text_to_epub(translated_text.replace('\n','<br>'), new_filename, language_code, title)
         pbar.update(1)
 
 
     # 将翻译后的文本同时写入txt文件 in case epub插件出问题
     with open(new_filenametxt, "w", encoding="utf-8") as f:
         f.write(translated_text)
-    
-print(f"Translation completed. Total cost: {cost_tokens} tokens.")
+cost = cost_tokens/1000*0.002    
+print(f"Translation completed. Total cost: {cost_tokens} tokens, ${cost}.")
 
 try:
     os.remove(jsonfile)
