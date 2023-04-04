@@ -265,6 +265,8 @@ cost_tokens=0
 
 # 翻译短文本
 def translate_text(text):
+
+    global cost_tokens
     
     # 调用openai的API进行翻译
     try:
@@ -479,7 +481,7 @@ else:
     with open(new_filenametxt, "w", encoding="utf-8") as f:
         f.write(translated_text)
     
-    print(f"Translation completion with cost of {cost_tokens}")
+print(f"Translation completion with cost :{cost_tokens} tokens")
 
 try:
     os.remove(jsonfile)
