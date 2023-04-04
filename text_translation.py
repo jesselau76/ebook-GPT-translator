@@ -481,7 +481,7 @@ else:
     with open(new_filenametxt, "w", encoding="utf-8") as f:
         f.write(translated_text)
     
-print(f"Translation completion with cost :{cost_tokens} tokens")
+print(f"Translation completed. Total cost: {cost_tokens} tokens.")
 
 try:
     os.remove(jsonfile)
