@@ -311,7 +311,7 @@ def translate_text(text):
             .decode()
         )
         # Get the token usage from the API response
-        cost_tokens = completion["usage"]["total_tokens"]
+        cost_tokens += completion["usage"]["total_tokens"]
     
     return t_text
 
