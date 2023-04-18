@@ -55,7 +55,7 @@ Change others options then press CTRL-X to save.
 
 run the command: 
 ```
-python3 text_translation.py [-h] [--test] filename
+python text_translation.py [-h] [--test] filename
 
 positional arguments:
   filename    Name of the input file
@@ -68,11 +68,11 @@ options:
 Simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
 
 ```
-python3 text_translation.py example.pdf
+python text_translation.py example.pdf
 ```
 or to translate a epub file named `example.epub`, you would run the following command:
 ```
-python3 text_translation.py example.epub
+python text_translation.py example.epub
 ```
 
 or to translate a docx file named `example.docx`, you would run the following command:
@@ -82,12 +82,12 @@ python3 text_translation.py example.docx
 
 or to translate a text file named `example.txt`, you would run the following command:
 ```
-python3 text_translation.py example.txt
+python text_translation.py example.txt
 ```
 
 to translate a MOBI file named example.mobi, you would run the following command:
 ```
-python3 text_translation.py example.mobi
+python text_translation.py example.mobi
 ```
 By default, the script will attempt to translate the text into the language specified in the `settings.cfg` file under the `target-language` option. You can also choose to output a bilingual version of the text by setting the `bilingual-output` option to `True`.
 
