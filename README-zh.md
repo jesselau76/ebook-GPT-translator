@@ -60,7 +60,7 @@ openai-apikey = sk-xxxxxxx
 运行命令：
 
 ```
-python3 text_translation.py [-h] [--test] filename
+python text_translation.py [-h] [--test] filename
 
 positional arguments:
   filename    Name of the input file
@@ -73,26 +73,26 @@ options:
 运行`text_translation.py`脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为`example.pdf`的 PDF 文件，您可以运行以下命令：
 
 ```
-python3 text_translation.py example.pdf
+python text_translation.py example.pdf
 ```
 或者要翻译名为 `example.epub` 的 epub 文件，您可以运行以下命令：
 ```
-python3 text_translation.py example.epub
+python text_translation.py example.epub
 ```
 
 或者要翻译名为 `example.docx` 的 docx 文件，您可以运行以下命令：
 ```
-python3 text_translation.py example.docx
+python text_translation.py example.docx
 ```
 
 或者要翻译名为 `example.mobi` 的 mobi 文件，您可以运行以下命令：
 
 ```
-python3 text_translation.py example.mobi
+python text_translation.py example.mobi
 ```
 或者要翻译名为 `example.txt` 的 text 文件，您可以运行以下命令：
 ```
-python3 text_translation.py example.txt
+python text_translation.py example.txt
 ```
 默认情况下，脚本会尝试将文本翻译成在 `target-language` 选项下的 `settings.cfg` 文件中指定的语言。 您还可以通过将`bilingual-output`选项设置为`True`来选择输出文本的双语版本。
 
@@ -107,7 +107,7 @@ python3 text_translation.py example.txt
 `settings.cfg` 文件包含几个可用于配置脚本行为的选项：
 
 - `openai-apikey`：您的 OpenAI API 的API Key
-- `target-language`：您要将文本翻译成的语言（例如，`ja` 用于日语，`zh` 用于中文，也可加入风格描述，如`文言文`、`红楼梦风格的半文言文`等）。
+- `prompt`: 你可以更改缺省的Chinese到"en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc，或用你常用的prompt定制。
 ![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
 
 - `bilingual-output`：是否输出文本的双语版本。
