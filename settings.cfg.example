@@ -3,7 +3,10 @@
 openai-apikey = sk-
 
 #Target language for translation, e.g. "en", "zh-cn", "ja",or "繁体中文","文言文"
-target-language = 金庸风格的白话文
+# target-language setting is deprecated, please use prompt setting instead
+
+#set prompt, you can change Chinese to "en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc
+prompt = "Please behave like GPT-4 model, translate the following text into Chinese"
 
 #Whether to output bilingual text or just translated text, set to "True" or "False"
 bilingual-output = True

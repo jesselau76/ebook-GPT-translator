@@ -124,7 +124,8 @@ with open('settings.cfg', encoding=encoding) as f:
 
 # 获取openai_apikey和language
 openai_apikey = config.get('option', 'openai-apikey')
-language_name = config.get('option', 'target-language')
+#language_name = config.get('option', 'target-language')
+prompt = config.get('option', 'prompt')
 bilingual_output = config.get('option', 'bilingual-output')
 language_code = config.get('option', 'langcode')
 # Get startpage and endpage as integers with default values
@@ -275,7 +276,7 @@ def translate_text(text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"translate the following text into {language_name}: \n{text}",
+                    "content": f"{prompt}: \n{text}",
                 }
             ],
         )
@@ -301,7 +302,7 @@ def translate_text(text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"translate the following text into {language_name}: \n{text}",
+                    "content": f"{prompt}: \n{text}",
                 }
             ],
         )
