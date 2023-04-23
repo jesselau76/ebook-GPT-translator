@@ -68,6 +68,7 @@ positional arguments:
 options:
   -h, --help  show this help message and exit
   --test      Only translate the first 3 short texts
+  --tlist     Use the translated name table
 ```
 
 运行`text_translation.py`脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为`example.pdf`的 PDF 文件，您可以运行以下命令：
@@ -102,6 +103,7 @@ python text_translation.py example.txt
 - 该代码提供了一个选项来输出双语文本。
 - 代码提供了一个进度条来显示PDF/EPUB到文本转换和翻译的进度
 - 测试功能，只翻译前三页以节省API用量。
+- 译名表功能，如果有翻译的译名表，可在翻译前预先替换，让结果更为准确。
 ## 配置
 
 `settings.cfg` 文件包含几个可用于配置脚本行为的选项：
@@ -114,6 +116,8 @@ python text_translation.py example.txt
 - `langcode`：输出 epub 文件的语言代码（例如 `ja` 表示日语，`zh` 表示中文等）。
 - `startpage`: 从指定的起始页码开始翻译，且仅适用于PDF文件。
 - `endpage`: 翻译将持续到PDF文件中指定的页码。此功能仅支持PDF文件。如果输入等于-1，则翻译将继续到文件结束。
+- `transliteration-list`: 译名表文件路径，格式参考示例xlsx文件 `transliteration-list-example.xlsx`。![](https://raw.githubusercontent.com/kagangtuya-star/picgo1/88f82ade7323ad23106cacb8d6fac1a4fe2fe9c3/Snipaste_2023-04-23_17-53-18.png)
+- `case-matching`: 使用译名表替换时是否开启大小写匹配。
 
 ## 输出
 
