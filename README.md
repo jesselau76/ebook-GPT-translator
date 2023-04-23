@@ -63,6 +63,7 @@ positional arguments:
 options:
   -h, --help  show this help message and exit
   --test      Only translate the first 3 short texts
+  --tlist     Use the translated name table
 ```
 
 Simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
@@ -97,6 +98,7 @@ By default, the script will attempt to translate the text into the language spec
 - The code provides an option to output bilingual text.
 - The code provides a progress bar to show the progress of PDF/EPUB to text conversion and translation
 - Test function available. Only translate 3 short texts to save your API usage with --test.
+- Translation table function, if there is a translation of the translation table, can be pre-replaced before translation, so that more accurate results with --tlist
 
 ## Configuration
 
@@ -109,6 +111,8 @@ The `settings.cfg` file contains several options that can be used to configure t
 - `langcode`: The language code for the output epub file (e.g. `ja` for Japanese, `zh` for Chinese, etc.).
 - `startpage`: Translation begins from the specified start page number and is exclusively available for PDF files.
 - `endpage`: Translation will continue until the specified page number in a PDF file. This feature supports PDF files exclusively. If the input is equal to -1, the translation will proceed until the end of the file.
+- `transliteration-list`: Translation table file path, format reference sample xlsx file `transliteration-list-example.xlsx`.![](https://raw.githubusercontent.com/kagangtuya-star/picgo1/88f82ade7323ad23106cacb8d6fac1a4fe2fe9c3/Snipaste_2023-04-23_17-53-18.png)
+- `case-matching`: Whether case matching is turned on when using translation table substitution.
 
 
 ## Output
