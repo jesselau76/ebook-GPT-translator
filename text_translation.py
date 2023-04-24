@@ -138,13 +138,6 @@ endpage = config.getint('option', 'endpage', fallback=-1)
 transliteration_list_file = config.get('option', 'transliteration-list')
 # 译名表替换是否开启大小写匹配？
 case_matching = config.get('option', 'case-matching')
-# # 是否使用译名表？
-# if len(sys.argv) > 1:
-#     option = sys.argv[1]
-#     if option == "-t":
-#         transliteration_list_exist = True
-# else:
-#     transliteration_list_exist = False
 
 # 设置openai的API密钥
 openai.api_key = openai_apikey
@@ -356,25 +349,24 @@ def translate_and_store(text):
     return translated_text
 
 
-# 根据译名表文件在翻译前进行替换
 def text_replace(long_string, xlsx_path, case_sensitive):
     # 读取excel文件，将第一列和第二列分别存为两个列表
     df = pd.read_excel(xlsx_path)
     old_words = df.iloc[:, 0].tolist()
     new_words = df.iloc[:, 1].tolist()
-
+    # 对旧词列表按照长度降序排序，并同步调整新词列表
+    old_words, new_words = zip(*sorted(zip(old_words, new_words), key=lambda x: len(x[0]), reverse=True))
     # 遍历两个列表，对字符串进行替换
     for i in range(len(old_words)):
         # 如果不区分大小写，就将字符串和被替换词都转为小写
         if not case_sensitive:
             lower_string = long_string.lower()
             lower_old_word = old_words[i].lower()
-            # 使用replace方法进行替换，注意要保留原字符串的大小写
-            long_string = long_string.replace(lower_old_word, new_words[i], lower_string.count(lower_old_word))
-        # 如果区分大小写，就直接使用replace方法进行替换
+            # 使用正则表达式进行替换，注意要保留原字符串的大小写
+            long_string = re.sub(r"\b" + lower_old_word + r"\b", new_words[i], long_string, flags=re.IGNORECASE)
+        # 如果区分大小写，就直接使用正则表达式进行替换
         else:
-            long_string = long_string.replace(old_words[i], new_words[i])
-
+            long_string = re.sub(r"\b" + old_words[i] + r"\b", new_words[i], long_string)
     # 返回替换后的字符串
     return long_string
 
