@@ -2,6 +2,9 @@
 #API key for OpenAI API
 openai-apikey = sk-
 
+#API Proxy Url, e.g. https://api.openai-proxy.com
+openai-proxy =
+
 #Target language for translation, e.g. "en", "zh-cn", "ja",or "繁体中文","文言文"
 # target-language setting is deprecated, please use prompt setting instead
 

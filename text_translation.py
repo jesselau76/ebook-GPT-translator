@@ -131,6 +131,7 @@ openai_apikey = config.get('option', 'openai-apikey')
 prompt = config.get('option', 'prompt')
 bilingual_output = config.get('option', 'bilingual-output')
 language_code = config.get('option', 'langcode')
+api_proxy=config.get('option', 'openai-proxy')
 # Get startpage and endpage as integers with default values
 startpage = config.getint('option', 'startpage', fallback=1)
 endpage = config.getint('option', 'endpage', fallback=-1)
@@ -142,6 +143,14 @@ case_matching = config.get('option', 'case-matching')
 # 设置openai的API密钥
 openai.api_key = openai_apikey
 import argparse
+
+# 如果配置文件有写，就设置api代理
+if len(api_proxy) == 0:
+    print("未检测到OpenAI API 代理，当前使用api地址为: " + openai.api_base)
+else:
+    api_proxy_url = api_proxy + "/v1"
+    openai.api_base = os.environ.get("OPENAI_API_BASE", api_proxy_url)
+    print("正在使用OpenAI API 代理，代理地址为: "+openai.api_base)
 
 # 创建参数解析器
 parser = argparse.ArgumentParser()
