@@ -141,6 +141,26 @@ case_matching = config.get('option', 'case-matching')
 
 # 设置openai的API密钥
 openai.api_key = openai_apikey
+
+# 将openai的API密钥分割成数组
+key_array = openai_apikey.split(',')
+
+def random_api_key():
+    return random.choice(key_array)
+
+def create_chat_completion(prompt, text, model="gpt-3.5-turbo", **kwargs):
+    openai.api_key = random_api_key()
+    return openai.ChatCompletion.create(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": f"{prompt}: \n{text}",
+            }
+        ],
+        **kwargs
+    )
+
 import argparse
 
 # 创建参数解析器
@@ -285,15 +305,7 @@ def translate_text(text):
 
     # 调用openai的API进行翻译
     try:
-        completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"{prompt}: \n{text}",
-                }
-            ],
-        )
+        completion = create_chat_completion(prompt, text)
         t_text = (
             completion["choices"][0]
             .get("message")
@@ -311,15 +323,7 @@ def translate_text(text):
         time.sleep(sleep_time)
         print(e, f"will sleep  {sleep_time} seconds")
 
-        completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"{prompt}: \n{text}",
-                }
-            ],
-        )
+        completion = create_chat_completion(prompt, text)
         t_text = (
             completion["choices"][0]
             .get("message")
