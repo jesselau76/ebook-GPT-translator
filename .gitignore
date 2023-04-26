@@ -1,0 +1,8 @@
+# book
+*.pdf
+*.epub
+*.txt
+!requirements.txt
+
+# config
+settings.cfg
