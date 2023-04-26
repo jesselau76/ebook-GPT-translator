@@ -99,6 +99,7 @@ python text_translation.py example.txt
 
 ## 特点
 - 代码从 settings.cfg 文件中读取 OpenAI API 密钥、目标语言和其他选项。
+- 该代码可以在配置文件中设置OpenAI API 代理。
 - 该代码分别使用 pdfminer 和 ebooklib 库将 PDF、DOCX 和 EPUB 文件转换为文本。
 - 该代码提供了一个选项来输出双语文本。
 - 代码提供了一个进度条来显示PDF/EPUB到文本转换和翻译的进度
@@ -109,6 +110,7 @@ python text_translation.py example.txt
 `settings.cfg` 文件包含几个可用于配置脚本行为的选项：
 
 - `openai-apikey`：您的 OpenAI API 的API Key
+- `openai-proxy`：OpenAI API 代理，如 `https://api.openai-proxy.com`，你可以在 [OpenAI API 代理](https://www.openai-proxy.com/) 看到一些用法与说明，如果你担心自己的API Key安全问题，可以查看 [Ice-Hazymoon/openai-scf-proxy](https://github.com/Ice-Hazymoon/openai-scf-proxy) 等反向代理API的项目自行搭建。
 - `prompt`: 你可以更改缺省的Chinese到"en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc，或用你常用的prompt定制。
 ![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
 
