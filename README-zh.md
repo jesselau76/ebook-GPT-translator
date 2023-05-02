@@ -53,7 +53,7 @@ nano settings.cfg
 openai-apikey = sk-xxxxxxx
 ```
 
-将sk-xxxxxxx替换为你的OpenAI api key.
+将sk-xxxxxxx替换为你的OpenAI api key (或者是 sk-xxxxxxx,sk-xxxxxxx 配置多个key)
 修改其他选项，然后退出保存
 
 如果需要先测试prompt,可以加--test参数只翻译前三段短文字。

@@ -1,5 +1,5 @@
 [option]
-#API key for OpenAI API
+#API key(s) for OpenAI API, e.g. "sk-xxxxxx" or "sk-xxxxxx,sk-xxxxxx"
 openai-apikey = sk-
 
 #Target language for translation, e.g. "en", "zh-cn", "ja",or "繁体中文","文言文"

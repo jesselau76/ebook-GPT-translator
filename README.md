@@ -50,7 +50,7 @@ nano settings.cfg
 ```
 openai-apikey = sk-xxxxxxx
 ```
-replace sk-xxxxxxx to your OpenAI api key.
+replace sk-xxxxxxx to your OpenAI api key (or sk-xxxxxxx,sk-xxxxxxx if you have more than one key).
 Change others options then press CTRL-X to save.
 
 run the command: 
