@@ -1,5 +1,5 @@
 [option]
-#API key for OpenAI API
+#API key(s) for OpenAI API, e.g. "sk-xxxxxx" or "sk-xxxxxx,sk-xxxxxx"
 openai-apikey = sk-
 
 #API Proxy Url, e.g. https://api.openai-proxy.com
