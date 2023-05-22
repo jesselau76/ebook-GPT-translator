@@ -298,7 +298,7 @@ def split_text(text):
 
 # 将句号替换为句号+回车
 def return_text(text):
-    text = text.replace(".", ".\n")
+    text = text.replace(". ", ".\n")
     text = text.replace("。", "。\n")
     text = text.replace("！", "！\n")
     return text
