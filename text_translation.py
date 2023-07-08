@@ -149,7 +149,7 @@ key_array = openai_apikey.split(',')
 def random_api_key():
     return random.choice(key_array)
 
-def create_chat_completion(prompt, text, model="gpt-3.5-turbo", **kwargs):
+def create_chat_completion(prompt, text, model="gpt-3.5-turbo-16k", **kwargs):
     openai.api_key = random_api_key()
     return openai.ChatCompletion.create(
         model=model,
@@ -274,7 +274,7 @@ def convert_pdf_to_text(pdf_filename, start_page=1, end_page=-1):
     return text
 
 
-# 将文本分成不大于1024字符的短文本list
+# 将文本分成不大于1024*4字符的短文本list
 def split_text(text):
     sentence_list = re.findall(r'.+?[。！？!?.]', text)
 
@@ -284,10 +284,10 @@ def split_text(text):
     short_text = ""
     # 遍历句子列表
     for s in sentence_list:
-        # 如果当前短文本加上新的句子长度不大于1024，则将新的句子加入当前短文本
-        if len(short_text + s) <= 1024:
+        # 如果当前短文本加上新的句子长度不大于1024*4，则将新的句子加入当前短文本
+        if len(short_text + s) <= 1024*4:
             short_text += s
-        # 如果当前短文本加上新的句子长度大于1024，则将当前短文本加入短文本列表，并重置当前短文本为新的句子
+        # 如果当前短文本加上新的句子长度大于1024*4，则将当前短文本加入短文本列表，并重置当前短文本为新的句子
         else:
             short_text_list.append(short_text)
             short_text = s
@@ -453,7 +453,7 @@ if filename.endswith('.epub'):
             if args.tlist:
                 text = text_replace(text, transliteration_list_file, case_matching)
 
-            # 将文本分成不大于1024字符的短文本list
+            # 将文本分成不大于1024*4字符的短文本list
             short_text_list = split_text(text)
             if args.test:
                 short_text_list = short_text_list[:3]
@@ -501,7 +501,7 @@ else:
     if args.tlist:
         text = text_replace(text, transliteration_list_file, case_matching)
 
-    # 将文本分成不大于1024字符的短文本list
+    # 将文本分成不大于1024*4字符的短文本list
     short_text_list = split_text(text)
     if args.test:
         short_text_list = short_text_list[:3]
