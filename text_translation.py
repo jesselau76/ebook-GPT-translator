@@ -150,8 +150,8 @@ def random_api_key():
     return random.choice(key_array)
 
 def create_chat_completion(prompt, text, model="gpt-3.5-turbo", **kwargs):
-    openai.api_key = random_api_key()
-    return openai.ChatCompletion.create(
+    client = openai.Client(api_key=random_api_key())
+    return client.chat.completions.create(
         model=model,
         messages=[
             {
