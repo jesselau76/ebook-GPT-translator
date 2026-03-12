@@ -13,7 +13,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from ebook_gpt_translator.config import AppConfig, apply_cli_overrides, ensure_runtime_paths, load_config
-from ebook_gpt_translator.pipeline import translate_file
+from ebook_gpt_translator.pipeline import inspect_resume_state, translate_file
 
 
 SUPPORTED_INPUTS = [
@@ -141,6 +141,7 @@ class TranslatorGUI:
         self.status_text = tk.StringVar(value="Idle")
         self.progress_value = tk.DoubleVar(value=0.0)
         self.progress_detail = tk.StringVar(value="No active translation.")
+        self.resume_status = tk.StringVar(value="Resume status unavailable.")
         self.codex_status = tk.StringVar(value=self._get_codex_status())
 
         self._build_layout()
@@ -266,6 +267,20 @@ class TranslatorGUI:
         ttk.Checkbutton(options, text="Overwrite", variable=self.overwrite).grid(row=1, column=2, sticky="w")
 
         row += 1
+        resume_box = ttk.LabelFrame(frame, text="Resume", padding=10)
+        resume_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        resume_box.columnconfigure(0, weight=1)
+        ttk.Label(resume_box, textvariable=self.resume_status, foreground="#4a4a4a", wraplength=760).grid(
+            row=0, column=0, columnspan=2, sticky="w"
+        )
+        ttk.Button(resume_box, text="Check resume", command=lambda: self._refresh_resume_status(log_message=True)).grid(
+            row=1, column=0, sticky="w", pady=(8, 0)
+        )
+        ttk.Button(resume_box, text="Resume previous job", command=lambda: self._start_translation(resume_only=True)).grid(
+            row=1, column=1, sticky="e", pady=(8, 0)
+        )
+
+        row += 1
         codex_box = ttk.LabelFrame(frame, text="Codex", padding=10)
         codex_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         codex_box.columnconfigure(1, weight=1)
@@ -379,11 +394,13 @@ class TranslatorGUI:
         path = filedialog.askopenfilename(filetypes=SUPPORTED_INPUTS)
         if path:
             self.file_path.set(path)
+            self._refresh_resume_status()
 
     def _choose_config(self) -> None:
         path = filedialog.askopenfilename(filetypes=[("Config", "*.toml *.cfg"), ("All files", "*.*")])
         if path:
             self.config_path.set(path)
+            self._refresh_resume_status()
 
     def _choose_env(self) -> None:
         path = filedialog.asksaveasfilename(defaultextension=".env", filetypes=[("Env", ".env"), ("All files", "*.*")])
@@ -401,6 +418,7 @@ class TranslatorGUI:
         )
         if path:
             self.glossary_path.set(path)
+            self._refresh_resume_status()
 
     def _save_example_config(self) -> None:
         path = filedialog.asksaveasfilename(defaultextension=".toml", filetypes=[("TOML", "*.toml")])
@@ -437,6 +455,25 @@ class TranslatorGUI:
         self.codex_status.set(self._get_codex_status())
         self._append_log(f"Codex status: {self.codex_status.get()}")
 
+    def _refresh_resume_status(self, log_message: bool = False) -> None:
+        form = self._collect_form()
+        input_file = Path(form["file_path"]) if form["file_path"] else None
+        if input_file is None or not input_file.exists():
+            self.resume_status.set("Select an input file to check whether resumable progress exists.")
+            return
+        try:
+            config = build_config_from_form(form)
+            status = inspect_resume_state(input_file, config)
+        except Exception as exc:
+            self.resume_status.set(f"Resume check failed: {exc}")
+            return
+        message = status.message
+        if status.memory_path:
+            message = f"{message} Memory: {status.memory_path}"
+        self.resume_status.set(message)
+        if log_message:
+            self._append_log(message)
+
     def _list_models(self) -> None:
         self.codex_model_choices = load_codex_model_choices()
         self.model_combo.configure(values=self.codex_model_choices)
@@ -459,8 +496,9 @@ class TranslatorGUI:
             self.model_combo.configure(values=["gpt-5.2-codex"])
         else:
             self.model_combo.configure(values=[self.model.get() or ""])
+        self._refresh_resume_status()
 
-    def _start_translation(self) -> None:
+    def _start_translation(self, resume_only: bool = False) -> None:
         if self.worker and self.worker.is_alive():
             messagebox.showinfo("Translation running", "A translation task is already running.")
             return
@@ -468,7 +506,28 @@ class TranslatorGUI:
             messagebox.showerror("Missing input", "Please choose an input file.")
             return
 
-        form = {
+        form = self._collect_form()
+        if resume_only:
+            config = build_config_from_form(form)
+            status = inspect_resume_state(Path(self.file_path.get()), config)
+            message = status.message
+            if not status.available or not status.compatible:
+                messagebox.showinfo("No resumable job", message)
+                self.resume_status.set(message)
+                return
+            self.resume_status.set(message)
+            self._append_log(message)
+
+        self.status_text.set("Running")
+        self.progress_value.set(0.0)
+        self.progress_detail.set("Preparing translation job...")
+        self._append_log(f"Starting translation for {self.file_path.get()}")
+        self.worker = threading.Thread(target=self._run_translation, args=(form,), daemon=True)
+        self.worker.start()
+
+    def _collect_form(self) -> dict[str, Any]:
+        return {
+            "file_path": self.file_path.get().strip(),
             "config_path": self.config_path.get().strip(),
             "env_file": self.env_file.get().strip(),
             "provider": self.provider.get().strip(),
@@ -496,13 +555,6 @@ class TranslatorGUI:
             "skip_existing": self.skip_existing.get(),
             "overwrite": self.overwrite.get(),
         }
-
-        self.status_text.set("Running")
-        self.progress_value.set(0.0)
-        self.progress_detail.set("Preparing translation job...")
-        self._append_log(f"Starting translation for {self.file_path.get()}")
-        self.worker = threading.Thread(target=self._run_translation, args=(form,), daemon=True)
-        self.worker.start()
 
     def _run_translation(self, form: dict[str, Any]) -> None:
         try:
@@ -539,6 +591,7 @@ class TranslatorGUI:
                         "stats: "
                         + ", ".join(f"{key}={value}" for key, value in payload["stats"].items())
                     )
+                    self._refresh_resume_status()
                     self._refresh_codex_status()
                 elif kind == "error":
                     self.status_text.set("Failed")

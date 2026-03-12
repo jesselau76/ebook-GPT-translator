@@ -94,3 +94,13 @@ class ProgressUpdate:
     message: str = ""
     cache_hits: int = 0
     api_calls: int = 0
+
+
+@dataclass(slots=True)
+class ResumeStatus:
+    available: bool = False
+    compatible: bool = False
+    completed_blocks: int = 0
+    total_blocks: int = 0
+    message: str = ""
+    memory_path: Path | None = None

@@ -4,6 +4,12 @@ Modernized ebook translation toolkit for TXT, EPUB, DOCX, PDF, and optional MOBI
 
 [中文说明](README-zh.md)
 
+## Demo Video
+
+<video src="./ebooktranslate.mp4" controls muted playsinline width="960"></video>
+
+Direct link: [ebooktranslate.mp4](./ebooktranslate.mp4)
+
 ## What changed in v2
 
 - Replaced the legacy global OpenAI API usage with client-based modern SDK integration
@@ -77,6 +83,7 @@ GUI notes:
 - The `Target language` field in the GUI is a common-language dropdown, but you can still type a custom language.
 - The GUI includes a `Custom prompt` box for style instructions such as `Translate into Chinese in a Dream of the Red Chamber style.`
 - The GUI now shows live progress for both blocks and chunked sub-steps, so long files no longer appear frozen during translation.
+- The GUI includes `Check resume` and `Resume previous job` actions. If Codex is interrupted, rerun the same file and settings to continue from cached chunks while rebuilding the same consistency state.
 
 Run a real translation:
 

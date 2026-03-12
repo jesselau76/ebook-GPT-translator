@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
 from collections import deque
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -16,7 +17,14 @@ from ebook_gpt_translator.chunking import split_text
 from ebook_gpt_translator.config import AppConfig, ensure_runtime_paths
 from ebook_gpt_translator.documents import load_document, write_outputs
 from ebook_gpt_translator.glossary import Glossary
-from ebook_gpt_translator.models import Document, OutputArtifacts, ProgressUpdate, TranslationContext, UsageStats
+from ebook_gpt_translator.models import (
+    Document,
+    OutputArtifacts,
+    ProgressUpdate,
+    ResumeStatus,
+    TranslationContext,
+    UsageStats,
+)
 from ebook_gpt_translator.providers import BaseProvider, build_provider
 
 
@@ -70,8 +78,9 @@ def translate_file(
     cache = TranslationCache(Path(config.runtime.cache_path))
     stats = UsageStats()
     memory_path = _memory_path(config, input_path)
+    resume_fingerprint = _build_resume_fingerprint(input_path, config)
     try:
-        memory_state = _load_memory_state(memory_path)
+        memory_state = _load_memory_state(memory_path, resume_fingerprint)
         _translate_document(
             document,
             config,
@@ -81,6 +90,7 @@ def translate_file(
             stats,
             memory_state,
             memory_path,
+            resume_fingerprint,
             progress_callback,
         )
         text_path, epub_path = write_outputs(document, config)
@@ -136,6 +146,7 @@ def _translate_document(
     stats: UsageStats,
     memory_state: dict,
     memory_path: Path,
+    resume_fingerprint: str,
     progress_callback: ProgressCallback | None = None,
 ) -> None:
     system_prompt = _build_system_prompt(config, glossary)
@@ -217,7 +228,15 @@ def _translate_document(
             chapter_memory.append(translated)
             recent_blocks.append((source_text, translated))
             _update_term_memory(term_memory, block_terms, source_text, translated)
-            _save_memory_state(memory_path, recent_blocks, chapter_memories, term_memory)
+            _save_memory_state(
+                memory_path,
+                recent_blocks,
+                chapter_memories,
+                term_memory,
+                stats.translated_blocks + 1,
+                total_blocks,
+                resume_fingerprint,
+            )
             stats.translated_blocks += 1
             progress.advance(task)
             _emit_progress(
@@ -430,6 +449,45 @@ def _memory_path(config: AppConfig, input_path: Path) -> Path:
     return Path(config.runtime.job_dir) / f"{safe_name}.memory.json"
 
 
+def inspect_resume_state(input_path: Path, config: AppConfig) -> ResumeStatus:
+    ensure_runtime_paths(config)
+    memory_path = _memory_path(config, input_path)
+    if not memory_path.exists():
+        return ResumeStatus(message="No saved resume state was found for this file.")
+
+    try:
+        payload = json.loads(memory_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ResumeStatus(
+            available=True,
+            compatible=False,
+            memory_path=memory_path,
+            message="A resume file exists but could not be read.",
+        )
+
+    expected_fingerprint = _build_resume_fingerprint(input_path, config)
+    stored_fingerprint = str(payload.get("resume_fingerprint", ""))
+    completed_blocks = int(payload.get("completed_blocks", 0) or 0)
+    total_blocks = int(payload.get("total_blocks", 0) or 0)
+    compatible = stored_fingerprint == expected_fingerprint and completed_blocks > 0
+
+    if compatible:
+        message = f"Resume available: {completed_blocks}/{total_blocks or '?'} blocks already completed."
+    elif completed_blocks > 0:
+        message = "Saved progress exists, but the current settings do not match the previous run."
+    else:
+        message = "A resume file exists, but no completed blocks were recorded yet."
+
+    return ResumeStatus(
+        available=True,
+        compatible=compatible,
+        completed_blocks=completed_blocks,
+        total_blocks=total_blocks,
+        message=message,
+        memory_path=memory_path,
+    )
+
+
 def _build_user_prompt(text: str, context: TranslationContext) -> str:
     sections = [
         "Translate the CURRENT_TEXT section into the requested target language.",
@@ -545,24 +603,30 @@ def _clip_text(text: str, limit: int) -> str:
     return normalized[: limit - 3].rstrip() + "..."
 
 
-def _load_memory_state(memory_path: Path) -> dict:
+def _load_memory_state(memory_path: Path, resume_fingerprint: str) -> dict:
     if not memory_path.exists():
         return {
             "recent_blocks": [],
             "chapter_memories": {},
             "term_memory": {},
+            "completed_blocks": 0,
+            "total_blocks": 0,
         }
     data = json.loads(memory_path.read_text(encoding="utf-8"))
+    if str(data.get("resume_fingerprint", "")) != resume_fingerprint:
+        return {
+            "recent_blocks": [],
+            "chapter_memories": {},
+            "term_memory": {},
+            "completed_blocks": 0,
+            "total_blocks": 0,
+        }
     return {
-        "recent_blocks": [tuple(item) for item in data.get("recent_blocks", [])],
-        "chapter_memories": {
-            str(chapter_id): list(items)
-            for chapter_id, items in data.get("chapter_memories", {}).items()
-        },
-        "term_memory": {
-            str(term): dict(value)
-            for term, value in data.get("term_memory", {}).items()
-        },
+        "recent_blocks": [],
+        "chapter_memories": {},
+        "term_memory": {},
+        "completed_blocks": int(data.get("completed_blocks", 0) or 0),
+        "total_blocks": int(data.get("total_blocks", 0) or 0),
     }
 
 
@@ -571,6 +635,9 @@ def _save_memory_state(
     recent_blocks: deque[tuple[str, str]],
     chapter_memories: dict[str, deque[str]],
     term_memory: dict[str, dict[str, str | int]],
+    completed_blocks: int,
+    total_blocks: int,
+    resume_fingerprint: str,
 ) -> None:
     payload = {
         "recent_blocks": list(recent_blocks),
@@ -579,5 +646,58 @@ def _save_memory_state(
             for chapter_id, memory in chapter_memories.items()
         },
         "term_memory": term_memory,
+        "completed_blocks": completed_blocks,
+        "total_blocks": total_blocks,
+        "resume_fingerprint": resume_fingerprint,
     }
     memory_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _build_resume_fingerprint(input_path: Path, config: AppConfig) -> str:
+    glossary_path = Path(config.glossary.path) if config.glossary.path else None
+    payload = {
+        "input": _path_signature(input_path),
+        "glossary": _path_signature(glossary_path) if glossary_path else None,
+        "provider": {
+            "kind": config.provider.kind,
+            "model": config.provider.model,
+            "reasoning_effort": config.provider.reasoning_effort,
+            "api_mode": config.provider.api_mode,
+            "api_base_url": config.provider.api_base_url,
+        },
+        "translation": {
+            "target_language": config.translation.target_language,
+            "custom_prompt": config.translation.custom_prompt,
+            "preserve_line_breaks": config.translation.preserve_line_breaks,
+            "context_window_blocks": config.translation.context_window_blocks,
+        },
+        "chunking": {
+            "max_chars": config.chunking.max_chars,
+            "max_tokens": config.chunking.max_tokens,
+        },
+        "input_options": {
+            "start_page": config.input.start_page,
+            "end_page": config.input.end_page,
+        },
+        "runtime": {
+            "dry_run": config.runtime.dry_run,
+            "test_mode": config.runtime.test_mode,
+        },
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _path_signature(path: Path | None) -> dict[str, str | int] | None:
+    if path is None:
+        return None
+    try:
+        stat = path.stat()
+    except OSError:
+        return {"path": str(path), "exists": 0}
+    return {
+        "path": str(path.resolve()),
+        "exists": 1,
+        "size": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+    }

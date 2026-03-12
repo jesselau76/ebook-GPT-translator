@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from ebook_gpt_translator.config import AppConfig
 from ebook_gpt_translator.providers import BaseProvider, ProviderResult
-from ebook_gpt_translator.pipeline import translate_file
+from ebook_gpt_translator.pipeline import inspect_resume_state, translate_file
 
 
 class PipelineTests(unittest.TestCase):
@@ -100,6 +100,35 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(stages[-1], "done")
         chunk_events = [event for event in events if event["stage"] == "chunk_started"]
         self.assertTrue(any(int(event["total_chunks"]) > 1 for event in chunk_events))
+
+    def test_inspect_resume_state_reports_compatible_and_mismatch_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source = Path(tmp_dir) / "sample.txt"
+            source.write_text("Chapter 1\n\nAlice met Bob.\n\nBob waved back.", encoding="utf-8")
+
+            config = AppConfig()
+            config.provider.kind = "mock"
+            config.output.output_dir = str(Path(tmp_dir) / "output")
+            config.runtime.cache_path = str(Path(tmp_dir) / ".cache" / "translation.sqlite3")
+            config.runtime.job_dir = str(Path(tmp_dir) / ".cache" / "jobs")
+
+            translate_file(source, config)
+            compatible = inspect_resume_state(source, config)
+            self.assertTrue(compatible.available)
+            self.assertTrue(compatible.compatible)
+            self.assertGreaterEqual(compatible.completed_blocks, 1)
+
+            changed = AppConfig()
+            changed.provider.kind = "mock"
+            changed.translation.target_language = "Japanese"
+            changed.output.output_dir = config.output.output_dir
+            changed.runtime.cache_path = config.runtime.cache_path
+            changed.runtime.job_dir = config.runtime.job_dir
+
+            mismatch = inspect_resume_state(source, changed)
+            self.assertTrue(mismatch.available)
+            self.assertFalse(mismatch.compatible)
+            self.assertIn("do not match", mismatch.message)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@
 
 [English README](README.md)
 
+## 演示视频
+
+<video src="./ebooktranslate.mp4" controls muted playsinline width="960"></video>
+
+直链：[ebooktranslate.mp4](./ebooktranslate.mp4)
+
 ## v2 升级内容
 
 - 将旧版全局 OpenAI API 调用迁移为基于客户端的现代 SDK 用法
@@ -77,6 +83,7 @@ GUI 说明：
 - GUI 里的 `Target language` 现在是常用语言下拉，同时也保留手动输入。
 - GUI 里有 `Custom prompt` 输入框，可以直接写类似 `用红楼梦的风格翻译成中文` 的要求。
 - GUI 现在会实时显示 block 和 chunk 两层进度，大文件翻译时不会再像卡死一样没有反馈。
+- GUI 现在提供 `Check resume` 和 `Resume previous job`。如果 Codex 中途断掉，用同一文件和同一组设置重开任务，就会继续复用已完成 chunk 的缓存，并重建一致性上下文。
 
 真实翻译：
 
