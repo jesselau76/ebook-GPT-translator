@@ -1,12 +1,11 @@
-pdfminer
-pdfminer.six 
-openai
-tqdm
-ebooklib
-bs4
-python-docx
-mobi
-chardet
-pandas
-lxml
-openpyxl
+beautifulsoup4>=4.12
+EbookLib>=0.18
+openai>=1.0.0
+pandas>=2.0.0
+PyMuPDF>=1.23
+python-docx>=1.1.0
+python-dotenv>=1.0.0
+rich>=13.7.0
+tiktoken>=0.7.0
+tomli>=2.0.0; python_version < "3.11"
+typer>=0.12.0

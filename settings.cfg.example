@@ -1,30 +1,20 @@
 [option]
-#API key(s) for OpenAI API, e.g. "sk-xxxxxx" or "sk-xxxxxx,sk-xxxxxx"
-openai-apikey = sk-
-
-#API Proxy Url, e.g. https://api.openai-proxy.com
-openai-proxy =
-
-#Target language for translation, e.g. "en", "zh-cn", "ja",or "繁体中文","文言文"
-# target-language setting is deprecated, please use prompt setting instead
-
-#set prompt, you can change Chinese to "en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc
-prompt = "Please behave like GPT-4 model, translate the following text into Chinese."
-
-#Whether to output bilingual text or just translated text, set to "True" or "False"
-bilingual-output = True
-
-#Language code of the output epub file, e.g. "en", "zh-cn", "ja"
-langcode = zh
-
-#Translation begins from the specified start page number and is exclusively available for PDF files.
+provider = codex
+model = gpt-5.2-codex
+reasoning-effort = medium
+openai-apikey =
+openai-api-base =
+api_version =
+api_mode = auto
+language = Simplified Chinese
+bilingual-output = false
+prompt = Please translate the following text into Simplified Chinese.
+context-window-blocks = 6
+max_len = 1800
+max_token = 1200
 startpage = 1
-
-#Translation will continue until the specified page number in a PDF file. This feature supports PDF files exclusively. If the input is equal to -1, the translation will proceed until the end of the file.
 endpage = -1
-
-#Foreign language transliteration list,a xlsx file，For example in the sample from English to simplified Chinese
 transliteration-list = transliteration-list-example.xlsx
-
-#Whether case matching is enabled by transliteration list replacement, set to "True" or "False"
-case-matching = True
+case-matching = false
+output_dir = output
+openai-proxy =

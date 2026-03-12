@@ -1,133 +1,205 @@
-# ebook-GPT-translator: Enjoy reading with your favorite style.
-[En](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README-zh.md)
+# ebook-GPT-translator
 
-This tool is designed to help users convert text from one format to another, as well as translate it into a different language using the OpenAI API (model="gpt-3.5-turbo"). It currently supports converting and translating PDF, DOCX, EPUB, and MOBI file formats into EPUB and text files and can translate text into multiple languages.
+Modernized ebook translation toolkit for TXT, EPUB, DOCX, PDF, and optional MOBI input. This version upgrades the original single-file project into a package with a real CLI, modern OpenAI SDK support, Azure/OpenAI-compatible providers, resume cache, glossary handling, tests, and release-ready packaging.
 
-Notes:
+[中文说明](README-zh.md)
 
-- For  PDF, DOCX, and MOBI files, only the text portions will be processed, and graphical elements will not appear in the resulting files.
-- For EPUB files, all graphical elements will be placed at the beginning of each chapter, as EPUB files use HTML language format. To maintain translation quality, the text will be translated in multiple segments without preserving the original formatting, so graphical elements will not be kept in their original positions but will be placed at the beginning of each chapter.
-- The startpage and endpage settings are only supported for PDF files. This is because the font size and page size may vary in EPUB, DOCX, MOBI,and TXT files, making it difficult to process.
+## What changed in v2
+
+- Replaced the legacy global OpenAI API usage with client-based modern SDK integration
+- Added provider abstraction for `openai`, `azure`, `compatible`, and offline `mock`
+- Added resume-safe SQLite translation cache and manifest files
+- Added configurable chunk and token limits for long books
+- Added `settings.toml`, `.env`, and full legacy `settings.cfg` compatibility
+- Added maintainable package layout under `src/`
+- Added unit tests and GitHub Actions CI
+- Preserved the old `text_translation.py` entrypoint as a compatibility wrapper
+
+## Supported providers
+
+- `codex`: local Codex CLI using your ChatGPT subscription login
+- `openai`: official OpenAI API
+- `azure`: Azure OpenAI deployment
+- `compatible`: any OpenAI-compatible endpoint, including Venice.ai-style APIs
+- `mock`: offline smoke testing without any API key
+
+## Supported formats
+
+- Input: `txt`, `md`, `epub`, `docx`, `pdf`
+- Optional input: `mobi` with `pip install mobi`
+- Output: translated `txt` and `epub`
 
 ## Installation
 
-To use this tool, you will need to have Python 3 installed on your system, as well as the following packages:
-
-- pdfminer
-- openai
-- tqdm
-- ebooklib
-- bs4
-- docx
-- mobi
-
-You can install these packages by running the following command:
-```
-pip install -r requirements.txt
-```
-
-git clone
-
-```
+```bash
 git clone https://github.com/jesselau76/ebook-GPT-translator.git
-```
-
-Update to new version
-```
 cd ebook-GPT-translator
-git pull
-pip install -r requirements.txt
-```
-## Usage
-
-To use this tool, you need rename settings.cfg.example to settings.cfg at first.
-```
-cd ebook-GPT-translator
-mv settings.cfg.example settings.cfg
-nano settings.cfg
+python3 -m pip install -r requirements.txt
 ```
 
-```
-openai-apikey = sk-xxxxxxx
-```
-replace sk-xxxxxxx to your OpenAI api key (or sk-xxxxxxx,sk-xxxxxxx if you have more than one key).
-Change others options then press CTRL-X to save.
+Optional MOBI support:
 
-run the command: 
-```
-python text_translation.py [-h] [--test] filename
-
-positional arguments:
-  filename    Name of the input file
-
-options:
-  -h, --help  show this help message and exit
-  --test      Only translate the first 3 short texts
-  --tlist     Use the translated name table
+```bash
+python3 -m pip install mobi
 ```
 
-Simply run the `text_translation.py` script with the file you want to translate or convert as an argument. For example, to translate a PDF file named `example.pdf`, you would run the following command:
+Optional XLSX glossary support:
 
-```
-python text_translation.py example.pdf
-```
-or to translate a epub file named `example.epub`, you would run the following command:
-```
-python text_translation.py example.epub
+```bash
+python3 -m pip install openpyxl
 ```
 
-or to translate a docx file named `example.docx`, you would run the following command:
-```
-python3 text_translation.py example.docx
-```
+## Quick start
 
-or to translate a text file named `example.txt`, you would run the following command:
-```
-python text_translation.py example.txt
+Create config:
+
+```bash
+python3 -m ebook_gpt_translator init-config
 ```
 
-to translate a MOBI file named example.mobi, you would run the following command:
+Launch the desktop GUI:
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator.gui
 ```
-python text_translation.py example.mobi
+
+Or, after installation:
+
+```bash
+ebook-gpt-translator-gui
 ```
-By default, the script will attempt to translate the text into the language specified in the `settings.cfg` file under the `target-language` option. You can also choose to output a bilingual version of the text by setting the `bilingual-output` option to `True`.
 
-## Feature
-- The code reads the OpenAI API key, target language, and other options from a settings.cfg file.
-- The code converts PDF, DOCX and EPUB files to text using the pdfminer and ebooklib libraries, respectively.
-- The code provides an option to output bilingual text.
-- The code provides a progress bar to show the progress of PDF/EPUB to text conversion and translation
-- Test function available. Only translate 3 short texts to save your API usage with --test.
-- Translation table function, if there is a translation of the translation table, can be pre-replaced before translation, so that more accurate results with --tlist
+GUI notes:
 
-## Configuration
+- `Config file` is optional. Leave it empty to use the values currently selected in the GUI.
+- Use a config file when you want to save a repeatable preset for provider, language, context window, and output options.
+- The `Model` field in the GUI is a dropdown loaded from your local Codex model cache.
+- The `Target language` field in the GUI is a common-language dropdown, but you can still type a custom language.
+- The GUI includes a `Custom prompt` box for style instructions such as `Translate into Chinese in a Dream of the Red Chamber style.`
 
-The `settings.cfg` file contains several options that can be used to configure the behavior of the script:
+Run a real translation:
 
-- `openai-apikey`: Your API key for the OpenAI API.
-- `prompt`: you can change Chinese to "en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc
-![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
-- `bilingual-output`: Whether or not to output a bilingual version of the text.
-- `langcode`: The language code for the output epub file (e.g. `ja` for Japanese, `zh` for Chinese, etc.).
-- `startpage`: Translation begins from the specified start page number and is exclusively available for PDF files.
-- `endpage`: Translation will continue until the specified page number in a PDF file. This feature supports PDF files exclusively. If the input is equal to -1, the translation will proceed until the end of the file.
-- `transliteration-list`: Translation table file path, format reference sample xlsx file `transliteration-list-example.xlsx`.![](https://raw.githubusercontent.com/kagangtuya-star/picgo1/88f82ade7323ad23106cacb8d6fac1a4fe2fe9c3/Snipaste_2023-04-23_17-53-18.png)
-- `case-matching`: Whether case matching is turned on when using translation table substitution.
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --config settings.toml \
+  --provider codex \
+  --model gpt-5.2-codex \
+  --reasoning-effort medium \
+  --target-language "Simplified Chinese"
+```
 
+Run with Codex subscription login:
 
-## Output
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider codex
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider codex \
+  --model gpt-5.2-codex \
+  --reasoning-effort medium \
+  --target-language "Simplified Chinese"
+```
 
+Run an offline smoke test:
 
-The output of the script will be an EPUB file with the same name as the input file, but with `_translated` appended to the end. For example, if the input file is `example.pdf`, the output file will be `example_translated.epub` and `example_translated.txt`.
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator translate sample.txt \
+  --provider mock \
+  --target-language German
+```
 
-## License
+Save OpenAI credentials locally:
 
-This tool is released under the MIT License.
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider openai
+```
 
-## Disclaimer:
+Default provider notes:
 
-This project is intended for use with public domain books and materials only. It is not designed for use with copyrighted content. Users are strongly advised to carefully review copyright information before utilizing this project and to adhere to relevant laws and regulations in order to protect their own rights and the rights of others.
+- The default provider is now `codex`
+- The default model is `gpt-5.2-codex`
+- The default reasoning effort is `medium`
+- Long-form consistency is enabled by default with `context_window_blocks = 6`
+- Chapter memory, rolling translated context, and automatic term memory are enabled by default
+- Cross-chapter memory is persisted to a sidecar memory file and reused on reruns
+- You can choose cheaper/faster Codex runs with `--reasoning-effort low`
+- You can switch models with `--model`, for example `gpt-5.2-codex`, `gpt-5.1-codex`, or `gpt-5-codex-mini`
+- You can override the rolling context size with `--context-window`
+- The GUI exposes the same provider/model/context settings without requiring long CLI commands
 
-The authors and developers of this project shall not be held responsible for any loss or damage resulting from the use of this project. Users assume all risks associated with its use. It is the responsibility of users to ensure they have obtained permission from the original copyright holder or used open-source PDF, EPUB, or MOBI files before employing this project to avoid potential copyright risks.
+Use Codex login status:
 
-If you have any concerns or suggestions about the use of this project, please contact us through the issues section.
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth status
+```
+
+List local Codex models:
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models
+```
+
+Use the legacy entrypoint:
+
+```bash
+PYTHONPATH=src python3 text_translation.py translate sample.txt --provider mock
+```
+
+## Azure OpenAI example
+
+```toml
+[provider]
+kind = "azure"
+model = "your-deployment-name"
+api_key = "..."
+api_base_url = "https://your-resource.openai.azure.com/"
+api_version = "2024-02-01"
+api_mode = "chat"
+```
+
+## OpenAI-compatible endpoint example
+
+```toml
+[provider]
+kind = "compatible"
+model = "llama-3.1-405b"
+api_key = "..."
+api_base_url = "https://api.example.com/v1"
+api_mode = "chat"
+```
+
+## Key features
+
+- `--skip-existing` skips files when translated outputs already exist
+- The SQLite cache avoids repeated API calls and acts as the primary resume mechanism
+- `--test` translates only the first few blocks for prompt validation
+- Glossary CSV and XLSX files let you pin terminology before sending text to the model
+- Chapter memory, rolling translated context, and automatic term memory are included by default to improve long-novel consistency
+- Translation memory is persisted in `.cache/jobs/*.memory.json` for cross-chapter reuse and restarts
+- `--txt-only` and `--epub-only` support lighter workflows
+- Generated manifest files record outputs, config, and usage stats
+
+## Configuration files
+
+- `settings.toml.example`: recommended format
+- `settings.cfg.example`: legacy-compatible `[option]` format from the original project
+- `.env.example`: environment variable override reference
+- `examples.glossary.csv`: sample glossary file
+- `transliteration-list-example.xlsx`: original sample glossary workbook
+
+## Development
+
+Run tests:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+Package build:
+
+```bash
+python3 -m pip install -e .
+```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jesselau76/ebook-GPT-translator&type=Date)](https://star-history.com/#jesselau76/ebook-GPT-translator&Date)

@@ -1,8 +1,13 @@
-# book
-*.pdf
-*.epub
-*.txt
-!requirements.txt
+.cache/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+output/
 
-# config
-settings.cfg

@@ -1,139 +1,173 @@
-# ebook-GPT-Translator: : Enjoy reading with your favorite style.
+# ebook-GPT-translator
 
-[En](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/ebook-GPT-translator/blob/main/README-zh.md)
+这是一个完成现代化升级后的电子书翻译工具，支持 TXT、EPUB、DOCX、PDF，以及可选的 MOBI 输入。新版本不再依赖旧的单文件脚本模式，而是重构为可维护的 Python 包，补上现代 OpenAI SDK、Azure/OpenAI-compatible provider、断点续跑缓存、术语表、测试和发布基础。
 
-该工具旨在帮助用户将文本从一种格式转换为另一种格式，以及使用 OpenAI API (model=`gpt-3.5-turbo`) 将其翻译成另一种语言。 目前支持PDF、DOCX、MOBI和EPUB文件格式转换翻译成EPUB文件及文本文件，可以将文字翻译成多种语言。
+[English README](README.md)
 
-注：
-- PDF、DOCX及MOBI文件只处理其中文本部分，图形部分不会出现在结果文件中。
-- EPUB文件的图形部分全部放在每章之初，因EPUB文件为HTML语言格式，若保持原有格式需要大量拆分文字，以多段文字一并翻译保持翻译水准为原则，故图形部分不保持在原有位置，而全部放在每章最初。
-- 初始页面、最终页面设置仅支持PDF文件。因EPUB、DOCX、MOBI及TXT文件等因字体大小，页面大小会有不同，无法处理页码。
+## v2 升级内容
 
+- 将旧版全局 OpenAI API 调用迁移为基于客户端的现代 SDK 用法
+- 增加 `openai`、`azure`、`compatible`、`mock` 四类 provider
+- 增加基于 SQLite 的翻译缓存和 manifest，支持长任务续跑
+- 增加分块和 token 上限控制，适配长文档
+- 新增 `settings.toml`、`.env`，并完整兼容旧版 `[option]` 风格 `settings.cfg`
+- 重构为 `src/` 包结构，便于维护和发布
+- 增加单元测试和 GitHub Actions CI
+- 保留旧入口 `text_translation.py`，降低迁移成本
 
-你需要申请OpenAI API KEY,[申请地址](https://platform.openai.com/)，现有免费使用额度，3个月有效。
+## 支持的 provider
+
+- `codex`：本机 Codex CLI，直接复用 ChatGPT subscription 登录态
+- `openai`：官方 OpenAI API
+- `azure`：Azure OpenAI 部署
+- `compatible`：任意 OpenAI-compatible 接口，包括 Venice.ai 这类第三方服务
+- `mock`：离线冒烟测试，不需要 API key
+
+## 支持的格式
+
+- 输入：`txt`、`md`、`epub`、`docx`、`pdf`
+- 可选输入：`mobi`，需要额外执行 `pip install mobi`
+- 输出：翻译后的 `txt` 和 `epub`
 
 ## 安装
 
-要使用此工具，您需要在系统上安装 Python 3 以及以下软件包：
-
-- pdfminer
-- openai
-- tqdm
-- ebooklib
-- bs4
-- docx
-- mobi
-
-您可以通过运行以下命令来安装这些软件包：
-```
-pip install -r requirements.txt
-```
-
-git clone本git
-
-```
+```bash
 git clone https://github.com/jesselau76/ebook-GPT-translator.git
-```
-升级到新版
-```
 cd ebook-GPT-translator
-git pull
-pip install -r requirements.txt
-```
-## 用法
-
-使用前将settings.cfg.example改名为settings.cfg并用任何一款编辑器编辑.
-```
-cd ebook-GPT-translator
-mv settings.cfg.example settings.cfg
-nano settings.cfg
-```
-打开settings.cfg文件后
-```
-openai-apikey = sk-xxxxxxx
+python3 -m pip install -r requirements.txt
 ```
 
-将sk-xxxxxxx替换为你的OpenAI api key (或者是 sk-xxxxxxx,sk-xxxxxxx 配置多个key)
-修改其他选项，然后退出保存
+如果需要 MOBI：
 
-如果需要先测试prompt,可以加--test参数只翻译前三段短文字。
-运行命令：
-
-```
-python text_translation.py [-h] [--test] filename
-
-positional arguments:
-  filename    Name of the input file
-
-options:
-  -h, --help  show this help message and exit
-  --test      Only translate the first 3 short texts
-  --tlist     Use the translated name table
+```bash
+python3 -m pip install mobi
 ```
 
-运行`text_translation.py`脚本，将要翻译或转换的文件作为参数。 例如，要翻译名为`example.pdf`的 PDF 文件，您可以运行以下命令：
+如果需要 XLSX 术语表支持：
 
-```
-python text_translation.py example.pdf
-```
-或者要翻译名为 `example.epub` 的 epub 文件，您可以运行以下命令：
-```
-python text_translation.py example.epub
+```bash
+python3 -m pip install openpyxl
 ```
 
-或者要翻译名为 `example.docx` 的 docx 文件，您可以运行以下命令：
+## 快速开始
+
+生成配置文件：
+
+```bash
+python3 -m ebook_gpt_translator init-config
 ```
-python text_translation.py example.docx
+
+启动桌面 GUI：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator.gui
 ```
 
-或者要翻译名为 `example.mobi` 的 mobi 文件，您可以运行以下命令：
+或者安装后直接运行：
 
+```bash
+ebook-gpt-translator-gui
 ```
-python text_translation.py example.mobi
+
+GUI 说明：
+
+- `Config file` 是可选项。不填时，直接使用 GUI 当前表单里的设置。
+- 如果你想保存一套固定预设，比如 provider、语言、上下文窗口、输出选项，再使用 config file。
+- GUI 里的 `Model` 现在是下拉列表，会从你本机的 Codex 模型缓存里读取。
+- GUI 里的 `Target language` 现在是常用语言下拉，同时也保留手动输入。
+- GUI 里有 `Custom prompt` 输入框，可以直接写类似 `用红楼梦的风格翻译成中文` 的要求。
+
+真实翻译：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --config settings.toml \
+  --provider codex \
+  --model gpt-5.2-codex \
+  --reasoning-effort medium \
+  --target-language "Simplified Chinese"
 ```
-或者要翻译名为 `example.txt` 的 text 文件，您可以运行以下命令：
+
+使用 Codex subscription 登录直接翻译：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider codex
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider codex \
+  --model gpt-5.2-codex \
+  --reasoning-effort medium \
+  --target-language "Simplified Chinese"
 ```
-python text_translation.py example.txt
+
+离线冒烟测试：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator translate sample.txt \
+  --provider mock \
+  --target-language German
 ```
-默认情况下，脚本会尝试将文本翻译成在 `target-language` 选项下的 `settings.cfg` 文件中指定的语言。 您还可以通过将`bilingual-output`选项设置为`True`来选择输出文本的双语版本。
 
-## 特点
-- 代码从 settings.cfg 文件中读取 OpenAI API 密钥、目标语言和其他选项。
-- 该代码可以在配置文件中设置OpenAI API 代理。
-- 该代码分别使用 pdfminer 和 ebooklib 库将 PDF、DOCX 和 EPUB 文件转换为文本。
-- 该代码提供了一个选项来输出双语文本。
-- 代码提供了一个进度条来显示PDF/EPUB到文本转换和翻译的进度
-- 测试功能，只翻译前三页以节省API用量。
-- 译名表功能，如果有翻译的译名表，可在翻译前预先替换，让结果更为准确。
-## 配置
+本地保存 OpenAI 凭据：
 
-`settings.cfg` 文件包含几个可用于配置脚本行为的选项：
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider openai
+```
 
-- `openai-apikey`：您的 OpenAI API 的API Key
-- `openai-proxy`：OpenAI API 代理，如 `https://api.openai-proxy.com`，你可以在 [OpenAI API 代理](https://www.openai-proxy.com/) 看到一些用法与说明，如果你担心自己的API Key安全问题，可以查看 [Ice-Hazymoon/openai-scf-proxy](https://github.com/Ice-Hazymoon/openai-scf-proxy) 等反向代理API的项目自行搭建。
-- `prompt`: 你可以更改缺省的Chinese到"en", "zh-cn", "ja", "繁体中文","文言文", or "红楼梦风格的半文言文" etc，或用你常用的prompt定制。
-![文言文](https://user-images.githubusercontent.com/40444824/223943798-4faf91a0-05ec-4a4e-9731-ba80bc9845c2.png)
+默认 provider 说明：
 
-- `bilingual-output`：是否输出文本的双语版本。
-- `langcode`：输出 epub 文件的语言代码（例如 `ja` 表示日语，`zh` 表示中文等）。
-- `startpage`: 从指定的起始页码开始翻译，且仅适用于PDF文件。
-- `endpage`: 翻译将持续到PDF文件中指定的页码。此功能仅支持PDF文件。如果输入等于-1，则翻译将继续到文件结束。
-- `transliteration-list`: 译名表文件路径，格式参考示例xlsx文件 `transliteration-list-example.xlsx`。![](https://raw.githubusercontent.com/kagangtuya-star/picgo1/88f82ade7323ad23106cacb8d6fac1a4fe2fe9c3/Snipaste_2023-04-23_17-53-18.png)
-- `case-matching`: 使用译名表替换时是否开启大小写匹配。
+- 现在默认 provider 是 `codex`
+- 默认模型是 `gpt-5.2-codex`
+- 默认 reasoning effort 是 `medium`
+- 现在默认开启长篇一致性上下文，`context_window_blocks = 6`
+- 默认启用章节记忆、滚动上下文和术语记忆
+- 跨章节记忆会持久化到 sidecar memory 文件，重跑时继续复用
+- 如果你想更便宜更快，可以用 `--reasoning-effort low`
+- 如果你想切 Codex 模型，可以直接传 `--model`，例如 `gpt-5.2-codex`、`gpt-5.1-codex`、`gpt-5-codex-mini`
+- 如果你想调整滚动上下文大小，可以传 `--context-window`
+- 如果你不想手敲命令，GUI 已经暴露同样的 provider/model/context 配置项
 
-## 输出
+查看 Codex 登录状态：
 
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth status
+```
 
-脚本的输出将是一个与输入文件同名的 EPUB 文件，但在末尾附加了`_translated`。 例如，如果输入文件是`example.pdf`，输出文件将是`example_translated.epub` 与`example_translated.txt`。
+列出本机可用的 Codex 模型：
 
-## 版权
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models
+```
 
-这个工具是在 MIT 许可证下发布的。
+兼容旧入口：
 
-## 免责声明：
+```bash
+PYTHONPATH=src python3 text_translation.py translate sample.txt --provider mock
+```
 
-本项目仅适用于已进入公共领域的书籍和资料。它不适用于受版权保护的内容。在使用本项目之前，我们强烈建议用户仔细查阅版权信息，并遵守相关法律法规，以保护自己和他人的权益。
+## 历史需求对应实现
 
-对于因使用本项目而造成的任何损失或损害，本项目的作者和开发者概不负责。用户需承担与本项目使用相关的所有风险。在使用本项目之前，用户有责任确保已获得原版权持有者的许可，或使用开源 PDF、EPUB 或 MOBI 文件，以避免潜在的版权风险。
+- Azure OpenAI：通过 `provider.kind = "azure"` 支持
+- Venice.ai / 第三方兼容接口：通过 `provider.kind = "compatible"` 和 `api_base_url` 支持
+- 跳过功能：通过 `--skip-existing` 支持
+- 长文重试与续跑：通过 SQLite 缓存和 manifest 支持
+- 术语替换：通过 CSV 或 XLSX glossary 支持，兼容原仓库样例
+- 长篇一致性：默认携带章节记忆、前文已翻译上下文和术语记忆，帮助维持人名、地名、称谓和语气统一
+- 翻译记忆会保存到 `.cache/jobs/*.memory.json`，便于跨章节和断点重跑继续复用
 
-如果您对本项目的使用有任何疑虑或建议，请通过问题（issues）部分与我们联系。
+## 开发与测试
+
+运行测试：
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+本地安装：
+
+```bash
+python3 -m pip install -e .
+```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jesselau76/ebook-GPT-translator&type=Date)](https://star-history.com/#jesselau76/ebook-GPT-translator&Date)

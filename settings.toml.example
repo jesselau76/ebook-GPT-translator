@@ -1,0 +1,47 @@
+[provider]
+kind = "codex"
+model = "gpt-5.2-codex"
+reasoning_effort = "medium"
+api_key = ""
+api_base_url = ""
+api_version = ""
+api_mode = "auto"
+timeout_seconds = 120
+max_retries = 5
+proxy = ""
+
+[translation]
+target_language = "Simplified Chinese"
+bilingual_output = false
+custom_prompt = ""
+temperature = 0.2
+max_output_tokens = 0
+preserve_line_breaks = true
+context_window_blocks = 6
+
+[chunking]
+max_chars = 1800
+max_tokens = 1200
+test_limit = 3
+
+[input]
+start_page = 1
+end_page = -1
+
+[glossary]
+path = ""
+case_sensitive = false
+
+[output]
+output_dir = "output"
+emit_txt = true
+emit_epub = true
+skip_existing = false
+overwrite = false
+write_manifest = true
+
+[runtime]
+dry_run = false
+test_mode = false
+cache_path = ".cache/translation.sqlite3"
+job_dir = ".cache/jobs"
