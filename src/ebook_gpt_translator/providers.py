@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import shutil
 import subprocess
 import tempfile
@@ -110,6 +111,8 @@ class OpenAICompatibleProvider(BaseProvider):
 
 
 class CodexCLIProvider(BaseProvider):
+    max_empty_retries = 3
+
     def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
         self.provider_config = provider
         self.translation_config = translation
@@ -120,8 +123,11 @@ class CodexCLIProvider(BaseProvider):
     def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
         with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as handle:
             output_path = Path(handle.name)
+        with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as handle:
+            schema_path = Path(handle.name)
+        schema_path.write_text(json.dumps(self._output_schema(), indent=2), encoding="utf-8")
 
-        prompt = f"{system_prompt}\n\n{user_prompt or text}"
+        prompt = self._build_structured_prompt(system_prompt, user_prompt or text)
         cmd = [
             self.codex_command,
             "exec",
@@ -131,6 +137,8 @@ class CodexCLIProvider(BaseProvider):
             "--ephemeral",
             "--color",
             "never",
+            "--output-schema",
+            str(schema_path),
             "-o",
             str(output_path),
             "-",
@@ -141,27 +149,93 @@ class CodexCLIProvider(BaseProvider):
             cmd[2:2] = ["-c", f'model_reasoning_effort="{self.provider_config.reasoning_effort}"']
 
         try:
-            completed = subprocess.run(
-                cmd,
-                input=prompt,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=self.provider_config.timeout_seconds,
-            )
-        finally:
-            translated_text = output_path.read_text(encoding="utf-8", errors="ignore").strip()
-            output_path.unlink(missing_ok=True)
+            last_error = ""
+            for attempt in range(1, self.max_empty_retries + 1):
+                output_path.write_text("", encoding="utf-8")
+                completed = subprocess.run(
+                    cmd,
+                    input=prompt,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=self.provider_config.timeout_seconds,
+                )
+                raw_payload = output_path.read_text(encoding="utf-8", errors="ignore").strip()
+                stdout = (completed.stdout or "").strip()
+                stderr = (completed.stderr or "").strip()
 
-        if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
-            raise RuntimeError(
-                "Codex translation failed. Ensure `codex login` works in your shell. "
-                f"Exit code: {completed.returncode}. Details: {stderr[-1200:]}"
-            )
-        if not translated_text:
-            raise RuntimeError("Codex returned an empty translation.")
-        return ProviderResult(text=translated_text)
+                if completed.returncode != 0:
+                    raise RuntimeError(
+                        "Codex translation failed. Ensure `codex login` works in your shell. "
+                        f"Exit code: {completed.returncode}. Details: {stderr[-1200:]}"
+                    )
+
+                translated_text = self._extract_translation(raw_payload, stdout)
+                if translated_text:
+                    return ProviderResult(text=translated_text)
+
+                last_error = (
+                    "Codex returned an empty structured translation. "
+                    f"Attempt {attempt}/{self.max_empty_retries}. "
+                    f"stdout: {stdout[-400:]} stderr: {stderr[-400:]}"
+                )
+
+            raise RuntimeError(last_error or "Codex returned an empty structured translation.")
+        finally:
+            output_path.unlink(missing_ok=True)
+            schema_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _output_schema() -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "translation": {
+                    "type": "string",
+                    "description": "The translated text for the CURRENT_TEXT section only.",
+                }
+            },
+            "required": ["translation"],
+            "additionalProperties": False,
+        }
+
+    @staticmethod
+    def _build_structured_prompt(system_prompt: str, user_prompt: str) -> str:
+        return (
+            f"{system_prompt}\n\n"
+            f"{user_prompt}\n\n"
+            "Return a JSON object that matches the provided schema. "
+            "Set `translation` to the translated text only. "
+            "Do not return markdown fences, explanations, or extra keys. "
+            "If the source is difficult, still provide the best possible non-empty translation."
+        )
+
+    @staticmethod
+    def _extract_translation(raw_payload: str, stdout: str) -> str:
+        for candidate in (raw_payload, stdout):
+            if not candidate:
+                continue
+            parsed = CodexCLIProvider._parse_json_payload(candidate)
+            if parsed:
+                translation = str(parsed.get("translation", "")).strip()
+                if translation:
+                    return translation
+        return ""
+
+    @staticmethod
+    def _parse_json_payload(payload: str) -> dict[str, Any] | None:
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            start = payload.find("{")
+            end = payload.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                return None
+            try:
+                parsed = json.loads(payload[start : end + 1])
+            except json.JSONDecodeError:
+                return None
+        return parsed if isinstance(parsed, dict) else None
 
 
 def build_provider(provider: ProviderConfig, translation: TranslationConfig) -> BaseProvider:

@@ -4,11 +4,11 @@ Modernized ebook translation toolkit for TXT, EPUB, DOCX, PDF, and optional MOBI
 
 [中文说明](README-zh.md)
 
-## Demo Video
+## Demo
 
-<video src="./ebooktranslate.mp4" controls muted playsinline width="960"></video>
+![ebook-GPT-translator demo](./ebook.gif)
 
-Direct link: [ebooktranslate.mp4](./ebooktranslate.mp4)
+Direct link: [ebook.gif](./ebook.gif)
 
 ## What changed in v2
 
@@ -183,6 +183,7 @@ api_mode = "chat"
 - Glossary CSV and XLSX files let you pin terminology before sending text to the model
 - Chapter memory, rolling translated context, and automatic term memory are included by default to improve long-novel consistency
 - Translation memory is persisted in `.cache/jobs/*.memory.json` for cross-chapter reuse and restarts
+- The Codex provider now requests structured JSON output and parses the `translation` field, with automatic retry on empty structured responses
 - `--txt-only` and `--epub-only` support lighter workflows
 - Generated manifest files record outputs, config, and usage stats
 

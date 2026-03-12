@@ -4,11 +4,11 @@
 
 [English README](README.md)
 
-## 演示视频
+## 演示
 
-<video src="./ebooktranslate.mp4" controls muted playsinline width="960"></video>
+![ebook-GPT-translator 演示](./ebook.gif)
 
-直链：[ebooktranslate.mp4](./ebooktranslate.mp4)
+直链：[ebook.gif](./ebook.gif)
 
 ## v2 升级内容
 
@@ -161,6 +161,7 @@ PYTHONPATH=src python3 text_translation.py translate sample.txt --provider mock
 - 术语替换：通过 CSV 或 XLSX glossary 支持，兼容原仓库样例
 - 长篇一致性：默认携带章节记忆、前文已翻译上下文和术语记忆，帮助维持人名、地名、称谓和语气统一
 - 翻译记忆会保存到 `.cache/jobs/*.memory.json`，便于跨章节和断点重跑继续复用
+- Codex provider 现在会强制请求结构化 JSON，并只解析 `translation` 字段；遇到空结果会自动重试
 
 ## 开发与测试
 

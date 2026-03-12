@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import os
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from ebook_gpt_translator.models import Asset, Block, Chapter, Document
 
 
 TEXTUAL_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "blockquote", "pre"}
+_SENTENCE_BREAK_RE = re.compile(r"([。！？!?；;：:][\"'”’」』）】]*)")
 
 
 def load_document(path: Path, config: AppConfig) -> Document:
@@ -195,7 +197,7 @@ def _render_txt(document: Document, bilingual_output: bool) -> str:
             if block.kind == "image":
                 parts.append(f"[Image: {block.asset_id}]")
                 continue
-            translated = block.translated_text or block.text
+            translated = _format_reading_text(block.translated_text or block.text)
             if bilingual_output:
                 parts.append(block.text)
                 parts.append(translated)
@@ -240,7 +242,7 @@ def _write_epub(document: Document, output_path: Path, bilingual_output: bool) -
                 if block.asset_id:
                     html_parts.append(f'<p><img src="{html.escape(document.assets[block.asset_id].href)}" alt="" /></p>')
                 continue
-            translated = html.escape(block.translated_text or block.text)
+            translated = _format_epub_text(block.translated_text or block.text)
             if bilingual_output:
                 source = html.escape(block.text)
                 html_parts.append(f'<p class="source">{source}</p>')
@@ -270,6 +272,20 @@ def _write_epub(document: Document, output_path: Path, bilingual_output: bool) -
 
 def _split_paragraphs(text: str) -> list[str]:
     return [paragraph.strip() for paragraph in text.splitlines() if paragraph.strip()]
+
+
+def _format_reading_text(text: str) -> str:
+    normalized = "\n".join(line.rstrip() for line in text.strip().splitlines())
+    if not normalized:
+        return ""
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    normalized = _SENTENCE_BREAK_RE.sub(r"\1\n\n", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    return normalized.strip()
+
+
+def _format_epub_text(text: str) -> str:
+    return html.escape(_format_reading_text(text)).replace("\n\n", "<br /><br />").replace("\n", "<br />")
 
 
 def _resolve_asset_href(base_href: str, src: str) -> str:
