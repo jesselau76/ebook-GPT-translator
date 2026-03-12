@@ -6,6 +6,7 @@ from collections import deque
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -15,11 +16,12 @@ from ebook_gpt_translator.chunking import split_text
 from ebook_gpt_translator.config import AppConfig, ensure_runtime_paths
 from ebook_gpt_translator.documents import load_document, write_outputs
 from ebook_gpt_translator.glossary import Glossary
-from ebook_gpt_translator.models import Document, OutputArtifacts, TranslationContext, UsageStats
+from ebook_gpt_translator.models import Document, OutputArtifacts, ProgressUpdate, TranslationContext, UsageStats
 from ebook_gpt_translator.providers import BaseProvider, build_provider
 
 
 console = Console()
+ProgressCallback = Callable[[ProgressUpdate], None]
 _TERM_STOPWORDS = {
     "The",
     "A",
@@ -55,7 +57,11 @@ _ALL_CAPS_TERM_RE = re.compile(r"\b[A-Z]{2,}(?:-[A-Z]{2,})*\b")
 _SINGLE_CAP_TERM_RE = re.compile(r"\b[A-Z][a-z]{2,}\b")
 
 
-def translate_file(input_path: Path, config: AppConfig) -> tuple[Document, OutputArtifacts, UsageStats]:
+def translate_file(
+    input_path: Path,
+    config: AppConfig,
+    progress_callback: ProgressCallback | None = None,
+) -> tuple[Document, OutputArtifacts, UsageStats]:
     ensure_runtime_paths(config)
 
     document = load_document(input_path, config)
@@ -66,7 +72,17 @@ def translate_file(input_path: Path, config: AppConfig) -> tuple[Document, Outpu
     memory_path = _memory_path(config, input_path)
     try:
         memory_state = _load_memory_state(memory_path)
-        _translate_document(document, config, provider, glossary, cache, stats, memory_state, memory_path)
+        _translate_document(
+            document,
+            config,
+            provider,
+            glossary,
+            cache,
+            stats,
+            memory_state,
+            memory_path,
+            progress_callback,
+        )
         text_path, epub_path = write_outputs(document, config)
         manifest_path = None
         if config.output.write_manifest:
@@ -120,6 +136,7 @@ def _translate_document(
     stats: UsageStats,
     memory_state: dict,
     memory_path: Path,
+    progress_callback: ProgressCallback | None = None,
 ) -> None:
     system_prompt = _build_system_prompt(config, glossary)
     text_blocks = document.iter_text_blocks()
@@ -135,6 +152,16 @@ def _translate_document(
     }
     term_memory: dict[str, dict[str, str | int]] = memory_state["term_memory"]
     document_term_counts = _scan_document_term_counts(document)
+    total_blocks = len(text_blocks)
+
+    _emit_progress(
+        progress_callback,
+        ProgressUpdate(
+            stage="start",
+            total_blocks=total_blocks,
+            message=f"Loaded {total_blocks} text blocks from {document.title or document.source_path.name}.",
+        ),
+    )
 
     with Progress(
         SpinnerColumn(),
@@ -144,11 +171,25 @@ def _translate_document(
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task("Translating", total=len(text_blocks) or 1)
-        for chapter, block in text_blocks:
+        task = progress.add_task("Translating", total=total_blocks or 1)
+        for block_index, (chapter, block) in enumerate(text_blocks, start=1):
             source_text = glossary.apply(block.text)
             block_terms = _extract_candidate_terms(source_text, document_term_counts)
             chapter_memory = chapter_memories.setdefault(chapter.chapter_id, deque(maxlen=8))
+            _emit_progress(
+                progress_callback,
+                ProgressUpdate(
+                    stage="block_started",
+                    completed_blocks=stats.translated_blocks,
+                    total_blocks=total_blocks,
+                    current_block_index=block_index,
+                    chapter_title=chapter.translated_title or chapter.title,
+                    block_role=block.role,
+                    message=_describe_block(block_index, total_blocks, chapter, block),
+                    cache_hits=stats.cache_hits,
+                    api_calls=stats.api_calls,
+                ),
+            )
             context = TranslationContext(
                 document_title=document.title,
                 chapter_title=chapter.translated_title or chapter.title,
@@ -156,7 +197,20 @@ def _translate_document(
                 previous_blocks=list(recent_blocks),
                 relevant_terms=_build_relevant_term_memory(block_terms, term_memory),
             )
-            translated = _translate_text(source_text, config, provider, system_prompt, cache, stats, context)
+            translated = _translate_text(
+                source_text,
+                config,
+                provider,
+                system_prompt,
+                cache,
+                stats,
+                context,
+                block_index,
+                total_blocks,
+                chapter.translated_title or chapter.title,
+                block.role,
+                progress_callback,
+            )
             block.translated_text = translated
             if block.role == "heading" and chapter.title == block.text:
                 chapter.translated_title = translated
@@ -166,6 +220,32 @@ def _translate_document(
             _save_memory_state(memory_path, recent_blocks, chapter_memories, term_memory)
             stats.translated_blocks += 1
             progress.advance(task)
+            _emit_progress(
+                progress_callback,
+                ProgressUpdate(
+                    stage="block_finished",
+                    completed_blocks=stats.translated_blocks,
+                    total_blocks=total_blocks,
+                    current_block_index=block_index,
+                    chapter_title=chapter.translated_title or chapter.title,
+                    block_role=block.role,
+                    message=_describe_block(block_index, total_blocks, chapter, block, finished=True),
+                    cache_hits=stats.cache_hits,
+                    api_calls=stats.api_calls,
+                ),
+            )
+
+    _emit_progress(
+        progress_callback,
+        ProgressUpdate(
+            stage="done",
+            completed_blocks=stats.translated_blocks,
+            total_blocks=total_blocks,
+            message=f"Translated {stats.translated_blocks}/{total_blocks} blocks.",
+            cache_hits=stats.cache_hits,
+            api_calls=stats.api_calls,
+        ),
+    )
 
 
 def _translate_text(
@@ -176,6 +256,11 @@ def _translate_text(
     cache: TranslationCache,
     stats: UsageStats,
     context: TranslationContext,
+    block_index: int,
+    total_blocks: int,
+    chapter_title: str,
+    block_role: str,
+    progress_callback: ProgressCallback | None = None,
 ) -> str:
     chunks = split_text(
         text=text,
@@ -189,8 +274,28 @@ def _translate_text(
         chapter_title=context.chapter_title,
         previous_blocks=context.previous_blocks,
     )
-    for chunk in chunks:
+    total_chunks = len(chunks)
+    for chunk_index, chunk in enumerate(chunks, start=1):
         local_context.previous_chunks = list(zip(chunks[: len(translated_parts)], translated_parts))
+        _emit_progress(
+            progress_callback,
+            ProgressUpdate(
+                stage="chunk_started",
+                completed_blocks=stats.translated_blocks,
+                total_blocks=total_blocks,
+                current_block_index=block_index,
+                current_chunk_index=chunk_index,
+                total_chunks=total_chunks,
+                chapter_title=chapter_title,
+                block_role=block_role,
+                message=(
+                    f"Translating block {block_index}/{total_blocks}, "
+                    f"chunk {chunk_index}/{total_chunks}."
+                ),
+                cache_hits=stats.cache_hits,
+                api_calls=stats.api_calls,
+            ),
+        )
         user_prompt = _build_user_prompt(chunk, local_context)
         payload = {
             "provider": config.provider.kind,
@@ -210,6 +315,25 @@ def _translate_text(
             stats.prompt_tokens += usage.get("prompt_tokens", 0)
             stats.completion_tokens += usage.get("completion_tokens", 0)
             translated_parts.append(translated_text)
+            _emit_progress(
+                progress_callback,
+                ProgressUpdate(
+                    stage="chunk_finished",
+                    completed_blocks=stats.translated_blocks,
+                    total_blocks=total_blocks,
+                    current_block_index=block_index,
+                    current_chunk_index=chunk_index,
+                    total_chunks=total_chunks,
+                    chapter_title=chapter_title,
+                    block_role=block_role,
+                    message=(
+                        f"Used cache for block {block_index}/{total_blocks}, "
+                        f"chunk {chunk_index}/{total_chunks}."
+                    ),
+                    cache_hits=stats.cache_hits,
+                    api_calls=stats.api_calls,
+                ),
+            )
             continue
 
         if config.runtime.dry_run:
@@ -228,7 +352,43 @@ def _translate_text(
             stats.completion_tokens += result.completion_tokens
         cache.put(payload, translated_text, usage)
         translated_parts.append(translated_text)
+        _emit_progress(
+            progress_callback,
+            ProgressUpdate(
+                stage="chunk_finished",
+                completed_blocks=stats.translated_blocks,
+                total_blocks=total_blocks,
+                current_block_index=block_index,
+                current_chunk_index=chunk_index,
+                total_chunks=total_chunks,
+                chapter_title=chapter_title,
+                block_role=block_role,
+                message=(
+                    f"Finished block {block_index}/{total_blocks}, "
+                    f"chunk {chunk_index}/{total_chunks}."
+                ),
+                cache_hits=stats.cache_hits,
+                api_calls=stats.api_calls,
+            ),
+        )
     return _join_chunks(translated_parts)
+
+
+def _emit_progress(progress_callback: ProgressCallback | None, event: ProgressUpdate) -> None:
+    if progress_callback is not None:
+        progress_callback(event)
+
+
+def _describe_block(
+    block_index: int,
+    total_blocks: int,
+    chapter,
+    block,
+    finished: bool = False,
+) -> str:
+    action = "Finished" if finished else "Starting"
+    chapter_title = chapter.translated_title or chapter.title or "Untitled chapter"
+    return f"{action} block {block_index}/{total_blocks} in {chapter_title} [{block.role}]"
 
 
 def _join_chunks(parts: list[str]) -> str:

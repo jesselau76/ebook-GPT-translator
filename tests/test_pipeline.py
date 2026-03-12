@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 import json
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import patch
 
@@ -67,6 +68,38 @@ class PipelineTests(unittest.TestCase):
             memory_payload = json.loads(artifacts.memory_path.read_text(encoding="utf-8"))
             self.assertIn("term_memory", memory_payload)
             self.assertIn("Alice", memory_payload["term_memory"])
+
+    def test_progress_callback_reports_block_and_chunk_updates(self) -> None:
+        events: list[dict[str, object]] = []
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source = Path(tmp_dir) / "sample.txt"
+            source.write_text(
+                "Chapter 1\n\n"
+                + ("This is a deliberately long paragraph. " * 80)
+                + "\n\nSecond paragraph.",
+                encoding="utf-8",
+            )
+
+            config = AppConfig()
+            config.provider.kind = "mock"
+            config.chunking.max_chars = 200
+            config.chunking.max_tokens = 120
+            config.output.output_dir = str(Path(tmp_dir) / "output")
+            config.runtime.cache_path = str(Path(tmp_dir) / ".cache" / "translation.sqlite3")
+            config.runtime.job_dir = str(Path(tmp_dir) / ".cache" / "jobs")
+
+            translate_file(source, config, progress_callback=lambda event: events.append(asdict(event)))
+
+        stages = [str(event["stage"]) for event in events]
+        self.assertIn("start", stages)
+        self.assertIn("block_started", stages)
+        self.assertIn("chunk_started", stages)
+        self.assertIn("chunk_finished", stages)
+        self.assertIn("block_finished", stages)
+        self.assertEqual(stages[-1], "done")
+        chunk_events = [event for event in events if event["stage"] == "chunk_started"]
+        self.assertTrue(any(int(event["total_chunks"]) > 1 for event in chunk_events))
 
 
 if __name__ == "__main__":

@@ -79,3 +79,18 @@ class TranslationContext:
     previous_blocks: list[tuple[str, str]] = field(default_factory=list)
     previous_chunks: list[tuple[str, str]] = field(default_factory=list)
     relevant_terms: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ProgressUpdate:
+    stage: str
+    completed_blocks: int = 0
+    total_blocks: int = 0
+    current_block_index: int = 0
+    current_chunk_index: int = 0
+    total_chunks: int = 0
+    chapter_title: str = ""
+    block_role: str = ""
+    message: str = ""
+    cache_hits: int = 0
+    api_calls: int = 0

@@ -139,6 +139,8 @@ class TranslatorGUI:
         self.skip_existing = tk.BooleanVar(value=False)
         self.overwrite = tk.BooleanVar(value=False)
         self.status_text = tk.StringVar(value="Idle")
+        self.progress_value = tk.DoubleVar(value=0.0)
+        self.progress_detail = tk.StringVar(value="No active translation.")
         self.codex_status = tk.StringVar(value=self._get_codex_status())
 
         self._build_layout()
@@ -149,7 +151,7 @@ class TranslatorGUI:
 
     def _build_layout(self) -> None:
         self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=1)
+        self.root.rowconfigure(2, weight=1)
 
         header = ttk.Frame(self.root, padding=12)
         header.grid(row=0, column=0, sticky="ew")
@@ -160,9 +162,18 @@ class TranslatorGUI:
         ttk.Label(header, textvariable=self.status_text, foreground="#1f4f82").grid(
             row=0, column=1, sticky="e"
         )
+        progress_frame = ttk.Frame(self.root, padding=(12, 0, 12, 8))
+        progress_frame.grid(row=1, column=0, sticky="ew")
+        progress_frame.columnconfigure(0, weight=1)
+        ttk.Progressbar(progress_frame, variable=self.progress_value, maximum=100).grid(
+            row=0, column=0, sticky="ew"
+        )
+        ttk.Label(progress_frame, textvariable=self.progress_detail, foreground="#4a4a4a").grid(
+            row=1, column=0, sticky="w", pady=(4, 0)
+        )
 
         body = ttk.Panedwindow(self.root, orient=tk.VERTICAL)
-        body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        body.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
         form_container = ttk.Frame(body, padding=8)
         log_container = ttk.Frame(body, padding=8)
@@ -487,6 +498,8 @@ class TranslatorGUI:
         }
 
         self.status_text.set("Running")
+        self.progress_value.set(0.0)
+        self.progress_detail.set("Preparing translation job...")
         self._append_log(f"Starting translation for {self.file_path.get()}")
         self.worker = threading.Thread(target=self._run_translation, args=(form,), daemon=True)
         self.worker.start()
@@ -494,7 +507,11 @@ class TranslatorGUI:
     def _run_translation(self, form: dict[str, Any]) -> None:
         try:
             config = build_config_from_form(form)
-            document, artifacts, stats = translate_file(Path(self.file_path.get()), config)
+            document, artifacts, stats = translate_file(
+                Path(self.file_path.get()),
+                config,
+                progress_callback=lambda event: self.queue.put(("progress", asdict(event))),
+            )
             payload = {
                 "document": document.title,
                 "artifacts": asdict(artifacts),
@@ -508,8 +525,12 @@ class TranslatorGUI:
         try:
             while True:
                 kind, payload = self.queue.get_nowait()
-                if kind == "success":
+                if kind == "progress":
+                    self._handle_progress(payload)
+                elif kind == "success":
                     self.status_text.set("Done")
+                    self.progress_value.set(100.0)
+                    self.progress_detail.set("Translation completed.")
                     self._append_log(f"Finished: {payload['document']}")
                     for key, value in payload["artifacts"].items():
                         if value:
@@ -521,12 +542,56 @@ class TranslatorGUI:
                     self._refresh_codex_status()
                 elif kind == "error":
                     self.status_text.set("Failed")
+                    self.progress_detail.set("Translation failed.")
                     self._append_log(f"ERROR: {payload['error']}")
                     self._append_log(payload["traceback"])
                     messagebox.showerror("Translation failed", payload["error"])
         except Empty:
             pass
         self.root.after(150, self._process_queue)
+
+    def _handle_progress(self, payload: dict[str, Any]) -> None:
+        total_blocks = int(payload.get("total_blocks", 0) or 0)
+        completed_blocks = int(payload.get("completed_blocks", 0) or 0)
+        current_block_index = int(payload.get("current_block_index", 0) or 0)
+        current_chunk_index = int(payload.get("current_chunk_index", 0) or 0)
+        total_chunks = int(payload.get("total_chunks", 0) or 0)
+        stage = str(payload.get("stage", ""))
+        chapter_title = str(payload.get("chapter_title", "")).strip()
+        cache_hits = int(payload.get("cache_hits", 0) or 0)
+        api_calls = int(payload.get("api_calls", 0) or 0)
+        message = str(payload.get("message", "")).strip()
+
+        if total_blocks > 0:
+            percent = (completed_blocks / total_blocks) * 100
+            if stage in {"block_started", "chunk_started", "chunk_finished"} and current_block_index:
+                block_base = (current_block_index - 1) / total_blocks
+                chunk_fraction = 0.0
+                if total_chunks > 0:
+                    finished_chunks = current_chunk_index
+                    if stage == "chunk_started":
+                        finished_chunks = max(0, current_chunk_index - 1)
+                    chunk_fraction = finished_chunks / total_chunks
+                percent = max(percent, (block_base + (chunk_fraction / total_blocks)) * 100)
+            self.progress_value.set(min(100.0, percent))
+
+        detail_parts = []
+        if total_blocks:
+            detail_parts.append(f"Blocks {completed_blocks}/{total_blocks}")
+        if current_block_index:
+            detail_parts.append(f"Current block {current_block_index}")
+        if total_chunks:
+            detail_parts.append(f"Chunk {current_chunk_index}/{total_chunks}")
+        if chapter_title:
+            detail_parts.append(chapter_title)
+        detail_parts.append(f"API {api_calls}")
+        detail_parts.append(f"Cache {cache_hits}")
+        if message:
+            detail_parts.append(message)
+        self.progress_detail.set(" | ".join(detail_parts))
+
+        if stage in {"start", "block_started", "block_finished", "done"} and message:
+            self._append_log(message)
 
     def _append_log(self, message: str) -> None:
         self.log_widget.configure(state="normal")

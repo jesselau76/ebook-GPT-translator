@@ -76,6 +76,7 @@ GUI notes:
 - The `Model` field in the GUI is a dropdown loaded from your local Codex model cache.
 - The `Target language` field in the GUI is a common-language dropdown, but you can still type a custom language.
 - The GUI includes a `Custom prompt` box for style instructions such as `Translate into Chinese in a Dream of the Red Chamber style.`
+- The GUI now shows live progress for both blocks and chunked sub-steps, so long files no longer appear frozen during translation.
 
 Run a real translation:
 
