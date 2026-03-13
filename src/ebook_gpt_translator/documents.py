@@ -64,17 +64,24 @@ def _load_pdf_document(path: Path, config: AppConfig) -> Document:
     pdf = fitz.open(path)
     start_page = max(1, config.input.start_page)
     end_page = pdf.page_count if config.input.end_page in (-1, 0) else min(config.input.end_page, pdf.page_count)
-    chapters: list[Chapter] = []
+    all_blocks: list[Block] = []
+    block_counter = 0
     for page_number in range(start_page - 1, end_page):
         page = pdf.load_page(page_number)
         page_text = page.get_text("text").strip()
-        blocks = [
-            Block(block_id=f"page-{page_number + 1}-block-{index}", kind="text", role="paragraph", text=paragraph)
-            for index, paragraph in enumerate(_split_paragraphs(page_text), start=1)
-        ]
-        chapters.append(Chapter(chapter_id=f"page-{page_number + 1}", title=f"Page {page_number + 1}", blocks=blocks))
+        for paragraph in _split_paragraphs(page_text):
+            block_counter += 1
+            all_blocks.append(
+                Block(block_id=f"block-{block_counter}", kind="text", role="paragraph", text=paragraph)
+            )
     pdf.close()
-    return Document(source_path=path, format_name="pdf", title=path.stem.replace("_", " "), chapters=chapters)
+    title = path.stem.replace("_", " ")
+    return Document(
+        source_path=path,
+        format_name="pdf",
+        title=title,
+        chapters=[Chapter(chapter_id="chapter-1", title=title, blocks=all_blocks)],
+    )
 
 
 def _load_epub_document(path: Path) -> Document:
