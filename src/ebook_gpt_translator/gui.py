@@ -428,7 +428,54 @@ class TranslatorGUI:
         path = filedialog.askopenfilename(filetypes=[("Config", "*.toml *.cfg"), ("All files", "*.*")])
         if path:
             self.config_path.set(path)
+            self._load_config_into_form(path)
             self._refresh_resume_status()
+
+    def _load_config_into_form(self, config_path: str) -> None:
+        try:
+            config = load_config(config_path, self.env_file.get().strip() or None)
+        except Exception as exc:
+            self._append_log(f"Failed to load config: {exc}")
+            return
+        p = config.provider
+        t = config.translation
+        c = config.chunking
+        inp = config.input
+        g = config.glossary
+        o = config.output
+        if p.kind:
+            self.provider.set(p.kind)
+        if p.model:
+            self.model.set(p.model)
+        if p.reasoning_effort:
+            self.reasoning_effort.set(p.reasoning_effort)
+        if p.api_key:
+            self.api_key.set(p.api_key)
+        if p.api_base_url:
+            self.api_base_url.set(p.api_base_url)
+        if p.api_version:
+            self.api_version.set(p.api_version)
+        if p.api_mode:
+            self.api_mode.set(p.api_mode)
+        if t.target_language:
+            self.target_language.set(t.target_language)
+        if t.custom_prompt:
+            self.custom_prompt_box.delete("1.0", "end")
+            self.custom_prompt_box.insert("1.0", t.custom_prompt)
+        self.bilingual.set(t.bilingual_output)
+        self.context_window.set(t.context_window_blocks)
+        self.max_chars.set(c.max_chars)
+        self.max_tokens.set(c.max_tokens)
+        self.test_limit.set(c.test_limit)
+        self.start_page.set(inp.start_page)
+        self.end_page.set(inp.end_page)
+        if g.path:
+            self.glossary_path.set(g.path)
+        if o.output_dir:
+            self.output_dir.set(o.output_dir)
+        # Update model dropdown for the loaded provider
+        self._on_provider_changed()
+        self._append_log(f"Loaded config: {config_path}")
 
     def _choose_env(self) -> None:
         path = filedialog.asksaveasfilename(defaultextension=".env", filetypes=[("Env", ".env"), ("All files", "*.*")])
