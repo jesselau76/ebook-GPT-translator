@@ -20,6 +20,7 @@ class Block:
     text: str = ""
     translated_text: str = ""
     asset_id: str | None = None
+    heading_text: str = ""
 
     @property
     def is_text(self) -> bool:

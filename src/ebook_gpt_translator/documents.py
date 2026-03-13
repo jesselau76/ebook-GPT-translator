@@ -247,6 +247,12 @@ def _write_epub(document: Document, output_path: Path, bilingual_output: bool) -
                 source = html.escape(block.text)
                 html_parts.append(f'<p class="source">{source}</p>')
                 html_parts.append(f'<p class="translated">{translated}</p>')
+            elif block.heading_text:
+                # Merged block with heading: split first paragraph as <h2>, rest as <p>
+                parts = translated.split("<br /><br />", 1)
+                html_parts.append(f"<h2>{parts[0]}</h2>")
+                if len(parts) > 1:
+                    html_parts.append(f"<p>{parts[1]}</p>")
             else:
                 tag = "p" if block.role == "paragraph" else "h2"
                 html_parts.append(f"<{tag}>{translated}</{tag}>")

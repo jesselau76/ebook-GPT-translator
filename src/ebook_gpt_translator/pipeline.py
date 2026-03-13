@@ -139,20 +139,34 @@ def translate_file(
 
 
 def _merge_small_blocks(document: Document, max_chars: int, max_tokens: int, model: str = "") -> None:
-    """Merge consecutive small paragraph blocks within each chapter up to the chunk size limit."""
+    """Merge consecutive text blocks (including headings) within each chapter up to the chunk size limit.
+
+    Headings start a new merge group so they always appear at the beginning
+    of a merged block, giving the model context for what follows.
+    """
     for chapter in document.chapters:
         merged: list = []
         pending: list = []
         pending_text = ""
 
         for block in chapter.blocks:
-            if block.kind != "text" or block.role != "paragraph":
+            if block.kind != "text":
+                # Non-text blocks (images) break the merge chain
                 if pending:
                     _flush_pending(merged, pending, pending_text)
                     pending, pending_text = [], ""
                 merged.append(block)
                 continue
 
+            if block.role == "heading":
+                # Headings start a new merge group
+                if pending:
+                    _flush_pending(merged, pending, pending_text)
+                pending = [block]
+                pending_text = block.text
+                continue
+
+            # Paragraph: try to merge with pending
             candidate = f"{pending_text}\n\n{block.text}".strip() if pending_text else block.text
             if len(candidate) <= max_chars and estimate_tokens(candidate, model) <= max_tokens:
                 pending.append(block)
@@ -173,8 +187,15 @@ def _flush_pending(merged: list, pending: list, text: str) -> None:
 
     if len(pending) == 1:
         merged.append(pending[0])
-    else:
-        merged.append(Block(block_id=pending[0].block_id, kind="text", role="paragraph", text=text))
+        return
+    heading_text = pending[0].text if pending[0].role == "heading" else ""
+    merged.append(Block(
+        block_id=pending[0].block_id,
+        kind="text",
+        role="paragraph",
+        text=text,
+        heading_text=heading_text,
+    ))
 
 
 def _translate_document(
@@ -273,6 +294,9 @@ def _translate_document(
             block.translated_text = translated
             if block.role == "heading" and chapter.title == block.text:
                 chapter.translated_title = translated
+            elif block.heading_text and chapter.title == block.heading_text:
+                # Extract heading translation from merged block (first paragraph)
+                chapter.translated_title = translated.split("\n\n", 1)[0].strip()
             chapter_memory.append(translated)
             recent_blocks.append((source_text, translated))
             _update_term_memory(term_memory, block_terms, source_text, translated)

@@ -25,7 +25,10 @@ class PipelineTests(unittest.TestCase):
 
             document, artifacts, stats = translate_file(source, config)
 
-            self.assertEqual(document.chapters[0].blocks[0].translated_text, "[German] Chapter 1")
+            # Heading merged with paragraphs into one block
+            merged_text = document.chapters[0].blocks[0].translated_text
+            self.assertIn("[German] Chapter 1", merged_text)
+            self.assertIn("Hello world.", merged_text)
             self.assertTrue(artifacts.text_path and artifacts.text_path.exists())
             self.assertTrue(artifacts.epub_path and artifacts.epub_path.exists())
             self.assertTrue(artifacts.memory_path and artifacts.memory_path.exists())
