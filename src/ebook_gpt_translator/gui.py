@@ -734,7 +734,7 @@ class TranslatorGUI:
             return "ready" if completed.returncode == 0 else "installed (check auth)"
         if cli_name == "gemini":
             completed = subprocess.run(
-                [cli_path, "--version"],
+                [cli_path, "-v"],
                 text=True, capture_output=True, check=False, timeout=10,
             )
             if completed.returncode == 0:

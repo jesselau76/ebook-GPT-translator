@@ -368,15 +368,20 @@ class GeminiCLIProvider(BaseProvider):
 
     def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
         prompt = self._build_structured_prompt(system_prompt, user_prompt or text)
-        cmd = [self.gemini_command]
+        cmd = [
+            self.gemini_command,
+            "-p",
+            prompt,
+            "-o",
+            "json",
+        ]
         if self.provider_config.model:
             cmd.extend(["-m", self.provider_config.model])
-        # Pass prompt via stdin to handle long text safely
+
         last_error = ""
         for attempt in range(1, self.max_empty_retries + 1):
             completed = subprocess.run(
                 cmd,
-                input=prompt,
                 text=True,
                 capture_output=True,
                 check=False,
@@ -418,14 +423,24 @@ class GeminiCLIProvider(BaseProvider):
     def _extract_translation(stdout: str) -> str:
         if not stdout:
             return ""
-        # Try to parse as JSON with "translation" key
-        parsed = _parse_json_payload(stdout)
-        if parsed:
-            translation = str(parsed.get("translation", "")).strip()
+        # Gemini -o json returns an envelope with a "response" field
+        envelope = _parse_json_payload(stdout)
+        if envelope:
+            response = str(envelope.get("response", "")).strip()
+            if response:
+                # Try to parse response as JSON with "translation" key
+                inner = _parse_json_payload(response)
+                if inner:
+                    translation = str(inner.get("translation", "")).strip()
+                    if translation:
+                        return translation
+                # Fall back to raw response text (strip markdown fences)
+                return _strip_markdown_fences(response)
+            # Direct translation JSON
+            translation = str(envelope.get("translation", "")).strip()
             if translation:
                 return translation
-        # Fallback: strip markdown fences and use raw output
-        return _strip_markdown_fences(stdout)
+        return ""
 
 
 def build_provider(provider: ProviderConfig, translation: TranslationConfig) -> BaseProvider:
