@@ -110,15 +110,30 @@ class OpenAICompatibleProvider(BaseProvider):
         )
 
 
-class CodexCLIProvider(BaseProvider):
+class _CLIProviderBase(BaseProvider):
+    """Base class for CLI-based providers (Codex, Gemini, Claude)."""
+
     max_empty_retries = 3
+    cli_name: str = ""
+    cli_install_hint: str = ""
 
     def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
         self.provider_config = provider
         self.translation_config = translation
-        self.codex_command = shutil.which("codex")
-        if self.codex_command is None:
-            raise RuntimeError("Codex CLI was not found in PATH. Install Codex and run `codex login` first.")
+        self.cli_command = shutil.which(self.cli_name)
+        if self.cli_command is None:
+            raise RuntimeError(
+                f"{self.cli_name} CLI was not found in PATH. {self.cli_install_hint}"
+            )
+
+
+class CodexCLIProvider(_CLIProviderBase):
+    cli_name = "codex"
+    cli_install_hint = "Install Codex and run `codex login` first."
+
+    def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
+        super().__init__(provider, translation)
+        self.codex_command = self.cli_command
 
     def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
         with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as handle:
@@ -238,9 +253,105 @@ class CodexCLIProvider(BaseProvider):
         return parsed if isinstance(parsed, dict) else None
 
 
+class GeminiCLIProvider(_CLIProviderBase):
+    """Translates via the Gemini CLI (subprocess)."""
+
+    cli_name = "gemini"
+    cli_install_hint = "Install Gemini CLI: npm install -g @anthropic-ai/gemini-cli or see https://github.com/google-gemini/gemini-cli"
+
+    def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"{user_prompt or text}\n\n"
+            "Return ONLY the translated text, without any explanation, markdown fences, or extra formatting."
+        )
+        cmd = [self.cli_command]
+        if self.provider_config.model:
+            cmd.extend(["-m", self.provider_config.model])
+
+        last_error = ""
+        for attempt in range(1, self.max_empty_retries + 1):
+            completed = subprocess.run(
+                cmd,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.provider_config.timeout_seconds,
+            )
+            stdout = (completed.stdout or "").strip()
+            stderr = (completed.stderr or "").strip()
+
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    f"Gemini CLI translation failed. Exit code: {completed.returncode}. "
+                    f"Details: {stderr[-1200:]}"
+                )
+
+            if stdout:
+                return ProviderResult(text=stdout)
+
+            last_error = (
+                f"Gemini CLI returned empty output. Attempt {attempt}/{self.max_empty_retries}. "
+                f"stderr: {stderr[-400:]}"
+            )
+
+        raise RuntimeError(last_error or "Gemini CLI returned empty output.")
+
+
+class ClaudeCodeProvider(_CLIProviderBase):
+    """Translates via Claude Code CLI (subprocess)."""
+
+    cli_name = "claude"
+    cli_install_hint = "Install Claude Code: npm install -g @anthropic-ai/claude-code"
+
+    def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"{user_prompt or text}\n\n"
+            "Return ONLY the translated text, without any explanation, markdown fences, or extra formatting."
+        )
+        cmd = [self.cli_command, "-p"]
+        if self.provider_config.model:
+            cmd.extend(["--model", self.provider_config.model])
+
+        last_error = ""
+        for attempt in range(1, self.max_empty_retries + 1):
+            completed = subprocess.run(
+                cmd,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.provider_config.timeout_seconds,
+            )
+            stdout = (completed.stdout or "").strip()
+            stderr = (completed.stderr or "").strip()
+
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    f"Claude Code translation failed. Exit code: {completed.returncode}. "
+                    f"Details: {stderr[-1200:]}"
+                )
+
+            if stdout:
+                return ProviderResult(text=stdout)
+
+            last_error = (
+                f"Claude Code returned empty output. Attempt {attempt}/{self.max_empty_retries}. "
+                f"stderr: {stderr[-400:]}"
+            )
+
+        raise RuntimeError(last_error or "Claude Code returned empty output.")
+
+
 def build_provider(provider: ProviderConfig, translation: TranslationConfig) -> BaseProvider:
     if provider.kind == "mock":
         return MockProvider(translation)
     if provider.kind == "codex":
         return CodexCLIProvider(provider, translation)
+    if provider.kind == "gemini":
+        return GeminiCLIProvider(provider, translation)
+    if provider.kind == "claude":
+        return ClaudeCodeProvider(provider, translation)
     return OpenAICompatibleProvider(provider, translation)

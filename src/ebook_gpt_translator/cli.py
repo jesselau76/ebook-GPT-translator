@@ -23,7 +23,7 @@ def translate(
     input_path: Path = typer.Argument(..., exists=True, readable=True, help="Source ebook or text file."),
     config_path: str = typer.Option("", "--config", "-c", help="Path to settings.toml or legacy settings.cfg."),
     env_file: str = typer.Option("", "--env-file", help="Optional .env file."),
-    provider: str = typer.Option(None, "--provider", help="codex, openai, azure, compatible, or mock."),
+    provider: str = typer.Option(None, "--provider", help="codex, gemini, claude, openai, azure, compatible, or mock."),
     model: str = typer.Option(None, "--model", help="Model, Codex model slug, or Azure deployment name."),
     reasoning_effort: str = typer.Option(
         None,
@@ -111,37 +111,45 @@ def list_models(
     source: str = typer.Option(
         "codex",
         "--source",
-        help="Model catalog source. Currently only `codex` is supported.",
+        help="Model catalog source: codex, gemini, or claude.",
     ),
-    show_all: bool = typer.Option(False, "--all", help="Show all visible Codex models."),
+    show_all: bool = typer.Option(False, "--all", help="Show all visible models."),
 ) -> None:
-    if source != "codex":
-        raise typer.BadParameter("Only `codex` is currently supported.")
-    models = _load_codex_models()
-    if not models:
-        console.print("No Codex model cache found. Run `codex login` first.")
-        raise typer.Exit(1)
-
-    for model in models:
-        slug = model.get("slug", "")
-        visibility = model.get("visibility", "")
-        if not show_all and visibility not in {"list", "default", ""}:
-            continue
-        default_effort = model.get("default_reasoning_level", "")
-        efforts = [item.get("effort", "") for item in model.get("supported_reasoning_levels", [])]
-        description = model.get("description", "")
-        effort_text = ", ".join(effort for effort in efforts if effort)
-        console.print(f"{slug}")
-        console.print(f"  default effort: {default_effort or '(unset)'}")
-        console.print(f"  supported efforts: {effort_text or '(none)'}")
-        if description:
-            console.print(f"  {description}")
+    if source == "codex":
+        models = _load_codex_models()
+        if not models:
+            console.print("No Codex model cache found. Run `codex login` first.")
+            raise typer.Exit(1)
+        for model in models:
+            slug = model.get("slug", "")
+            visibility = model.get("visibility", "")
+            if not show_all and visibility not in {"list", "default", ""}:
+                continue
+            default_effort = model.get("default_reasoning_level", "")
+            efforts = [item.get("effort", "") for item in model.get("supported_reasoning_levels", [])]
+            description = model.get("description", "")
+            effort_text = ", ".join(effort for effort in efforts if effort)
+            console.print(f"{slug}")
+            console.print(f"  default effort: {default_effort or '(unset)'}")
+            console.print(f"  supported efforts: {effort_text or '(none)'}")
+            if description:
+                console.print(f"  {description}")
+    elif source == "gemini":
+        console.print("Common Gemini models:")
+        for m in GEMINI_MODELS:
+            console.print(f"  {m}")
+    elif source == "claude":
+        console.print("Common Claude models:")
+        for m in CLAUDE_MODELS:
+            console.print(f"  {m}")
+    else:
+        raise typer.BadParameter("source must be one of: codex, gemini, claude")
 
 
 @auth_app.command("login")
 def auth_login(
     env_file: Path = typer.Option(Path(".env"), "--env-file", help="Where to store credentials."),
-    provider: str = typer.Option("openai", "--provider", help="codex, openai, azure, or compatible."),
+    provider: str = typer.Option("openai", "--provider", help="codex, gemini, claude, openai, azure, or compatible."),
     api_key: str = typer.Option("", "--api-key", help="API key. Prompted if omitted."),
     api_base_url: str = typer.Option("", "--api-base-url", help="Custom base URL or Azure endpoint."),
     api_version: str = typer.Option("", "--api-version", help="Azure API version."),
@@ -154,13 +162,18 @@ def auth_login(
     target_language: str = typer.Option("", "--target-language", help="Optional default target language."),
 ) -> None:
     normalized_provider = provider.strip().lower()
-    if normalized_provider not in {"codex", "openai", "azure", "compatible"}:
-        raise typer.BadParameter("provider must be one of: codex, openai, azure, compatible")
+    if normalized_provider not in {"codex", "gemini", "claude", "openai", "azure", "compatible"}:
+        raise typer.BadParameter("provider must be one of: codex, gemini, claude, openai, azure, compatible")
 
-    if normalized_provider == "codex":
-        _run_codex_command(["login"])
+    if normalized_provider in {"codex", "gemini", "claude"}:
+        if normalized_provider == "codex":
+            _run_codex_command(["login"])
+        elif normalized_provider == "gemini":
+            _run_cli_tool("gemini", ["auth", "login"])
+        elif normalized_provider == "claude":
+            console.print("Claude Code uses ANTHROPIC_API_KEY environment variable for authentication.")
         values = _read_env_file(env_file)
-        values["EBOOK_TRANSLATOR_PROVIDER"] = "codex"
+        values["EBOOK_TRANSLATOR_PROVIDER"] = normalized_provider
         values.pop("EBOOK_TRANSLATOR_API_KEY", None)
         values.pop("EBOOK_TRANSLATOR_API_BASE_URL", None)
         values.pop("EBOOK_TRANSLATOR_API_VERSION", None)
@@ -174,9 +187,11 @@ def auth_login(
             values.pop("EBOOK_TRANSLATOR_REASONING_EFFORT", None)
         if target_language:
             values["EBOOK_TRANSLATOR_TARGET_LANGUAGE"] = target_language.strip()
+        if api_key:
+            values["EBOOK_TRANSLATOR_API_KEY"] = api_key.strip()
         _write_env_values(env_file, values)
         console.print(f"Saved provider selection to {env_file}")
-        console.print("Codex login completed. You can now translate with --provider codex.")
+        console.print(f"{normalized_provider} login completed. You can now translate with --provider {normalized_provider}.")
         return
 
     if not api_key:
@@ -229,6 +244,10 @@ def auth_status(
         )
         status_text = (completed.stdout or completed.stderr).strip()
         console.print(f"Codex CLI: {status_text or 'status unavailable'}")
+    gemini_path = shutil.which("gemini")
+    console.print(f"Gemini CLI: {'installed' if gemini_path else 'not found'}")
+    claude_path = shutil.which("claude")
+    console.print(f"Claude Code: {'installed' if claude_path else 'not found'}")
 
 
 @auth_app.command("logout")
@@ -331,6 +350,15 @@ def _run_codex_command(args: list[str]) -> None:
         raise typer.Exit(completed.returncode)
 
 
+def _run_cli_tool(name: str, args: list[str]) -> None:
+    tool_path = shutil.which(name)
+    if tool_path is None:
+        raise typer.BadParameter(f"{name} CLI was not found in PATH.")
+    completed = subprocess.run([tool_path, *args], check=False)
+    if completed.returncode != 0:
+        raise typer.Exit(completed.returncode)
+
+
 def _load_codex_models() -> list[dict]:
     cache_path = Path.home() / ".codex" / "models_cache.json"
     if not cache_path.exists():
@@ -339,8 +367,28 @@ def _load_codex_models() -> list[dict]:
     return data.get("models", [])
 
 
+GEMINI_MODELS = [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
+
+CLAUDE_MODELS = [
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-5-20250514",
+]
+
 TOML_CONFIG_EXAMPLE = """[provider]
+# kind: codex, gemini, claude, openai, azure, compatible, or mock
 kind = "codex"
+# Model name: depends on provider. Examples:
+#   codex: gpt-5.2-codex, gpt-5.1-codex
+#   gemini: gemini-2.5-pro, gemini-2.5-flash
+#   claude: claude-sonnet-4-6, claude-opus-4-6
+#   openai: gpt-4o, gpt-4o-mini
 model = "gpt-5.2-codex"
 reasoning_effort = "medium"
 api_key = ""

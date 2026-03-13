@@ -86,6 +86,29 @@ def build_config_from_form(form: dict[str, Any]) -> AppConfig:
     return config
 
 
+GEMINI_MODEL_CHOICES = [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
+
+CLAUDE_MODEL_CHOICES = [
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-5-20250514",
+]
+
+OPENAI_MODEL_CHOICES = [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4-turbo",
+    "o1",
+    "o1-mini",
+]
+
+
 def load_codex_model_choices() -> list[str]:
     try:
         from ebook_gpt_translator.cli import _load_codex_models
@@ -218,7 +241,7 @@ class TranslatorGUI:
             row,
             "Provider",
             self.provider,
-            ["codex", "openai", "azure", "compatible", "mock"],
+            ["codex", "gemini", "claude", "openai", "azure", "compatible", "mock"],
             on_select=lambda _event: self._on_provider_changed(),
         )
         row = self._combo_field(frame, row, "Model", self.model, self.codex_model_choices)
@@ -281,7 +304,7 @@ class TranslatorGUI:
         )
 
         row += 1
-        codex_box = ttk.LabelFrame(frame, text="Codex", padding=10)
+        codex_box = ttk.LabelFrame(frame, text="CLI Tools (Codex / Gemini / Claude)", padding=10)
         codex_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         codex_box.columnconfigure(1, weight=1)
         ttk.Label(codex_box, text="Status").grid(row=0, column=0, sticky="w")
@@ -475,15 +498,29 @@ class TranslatorGUI:
             self._append_log(message)
 
     def _list_models(self) -> None:
-        self.codex_model_choices = load_codex_model_choices()
-        self.model_combo.configure(values=self.codex_model_choices)
-        models = self.codex_model_choices
-        if not models:
-            self._append_log("No Codex model cache found.")
-            return
-        self._append_log("Codex models:")
+        provider = self.provider.get().strip().lower()
+        if provider == "gemini":
+            models = GEMINI_MODEL_CHOICES
+            self.model_combo.configure(values=models)
+            self._append_log("Gemini models:")
+        elif provider == "claude":
+            models = CLAUDE_MODEL_CHOICES
+            self.model_combo.configure(values=models)
+            self._append_log("Claude models:")
+        elif provider in {"openai", "azure", "compatible"}:
+            models = OPENAI_MODEL_CHOICES
+            self.model_combo.configure(values=models)
+            self._append_log("OpenAI models:")
+        else:
+            self.codex_model_choices = load_codex_model_choices()
+            self.model_combo.configure(values=self.codex_model_choices)
+            models = self.codex_model_choices
+            if not models:
+                self._append_log("No Codex model cache found.")
+                return
+            self._append_log("Codex models:")
         for model in models[:20]:
-            self._append_log(f"- {model}")
+            self._append_log(f"  - {model}")
 
     def _on_provider_changed(self) -> None:
         provider = self.provider.get().strip().lower()
@@ -492,6 +529,18 @@ class TranslatorGUI:
             self.model_combo.configure(values=self.codex_model_choices)
             if self.model.get() not in self.codex_model_choices and self.codex_model_choices:
                 self.model.set(self.codex_model_choices[0])
+        elif provider == "gemini":
+            self.model_combo.configure(values=GEMINI_MODEL_CHOICES)
+            if self.model.get() not in GEMINI_MODEL_CHOICES:
+                self.model.set(GEMINI_MODEL_CHOICES[0])
+        elif provider == "claude":
+            self.model_combo.configure(values=CLAUDE_MODEL_CHOICES)
+            if self.model.get() not in CLAUDE_MODEL_CHOICES:
+                self.model.set(CLAUDE_MODEL_CHOICES[0])
+        elif provider in {"openai", "azure", "compatible"}:
+            self.model_combo.configure(values=OPENAI_MODEL_CHOICES)
+            if self.model.get() not in OPENAI_MODEL_CHOICES:
+                self.model.set(OPENAI_MODEL_CHOICES[0])
         elif provider == "mock":
             self.model_combo.configure(values=["gpt-5.2-codex"])
         else:
