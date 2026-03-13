@@ -53,6 +53,8 @@ class PipelineTests(unittest.TestCase):
             config = AppConfig()
             config.provider.kind = "mock"
             config.translation.context_window_blocks = 2
+            config.chunking.max_chars = 30
+            config.chunking.max_tokens = 30
             config.output.output_dir = str(Path(tmp_dir) / "output")
             config.runtime.cache_path = str(Path(tmp_dir) / ".cache" / "translation.sqlite3")
             config.runtime.job_dir = str(Path(tmp_dir) / ".cache" / "jobs")

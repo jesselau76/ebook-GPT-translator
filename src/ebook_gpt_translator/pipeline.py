@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 from ebook_gpt_translator.cache import TranslationCache, write_manifest
-from ebook_gpt_translator.chunking import split_text
+from ebook_gpt_translator.chunking import estimate_tokens, split_text
 from ebook_gpt_translator.config import AppConfig, ensure_runtime_paths
 from ebook_gpt_translator.documents import load_document, write_outputs
 from ebook_gpt_translator.glossary import Glossary
@@ -73,6 +73,7 @@ def translate_file(
     ensure_runtime_paths(config)
 
     document = load_document(input_path, config)
+    _merge_small_blocks(document, config.chunking.max_chars, config.chunking.max_tokens, config.provider.model)
     provider = build_provider(config.provider, config.translation)
     glossary = Glossary.from_path(config.glossary.path, config.glossary.case_sensitive)
     cache = TranslationCache(Path(config.runtime.cache_path))
@@ -135,6 +136,45 @@ def translate_file(
         )
     finally:
         cache.close()
+
+
+def _merge_small_blocks(document: Document, max_chars: int, max_tokens: int, model: str = "") -> None:
+    """Merge consecutive small paragraph blocks within each chapter up to the chunk size limit."""
+    for chapter in document.chapters:
+        merged: list = []
+        pending: list = []
+        pending_text = ""
+
+        for block in chapter.blocks:
+            if block.kind != "text" or block.role != "paragraph":
+                if pending:
+                    _flush_pending(merged, pending, pending_text)
+                    pending, pending_text = [], ""
+                merged.append(block)
+                continue
+
+            candidate = f"{pending_text}\n\n{block.text}".strip() if pending_text else block.text
+            if len(candidate) <= max_chars and estimate_tokens(candidate, model) <= max_tokens:
+                pending.append(block)
+                pending_text = candidate
+            else:
+                if pending:
+                    _flush_pending(merged, pending, pending_text)
+                pending = [block]
+                pending_text = block.text
+
+        if pending:
+            _flush_pending(merged, pending, pending_text)
+        chapter.blocks = merged
+
+
+def _flush_pending(merged: list, pending: list, text: str) -> None:
+    from ebook_gpt_translator.models import Block
+
+    if len(pending) == 1:
+        merged.append(pending[0])
+    else:
+        merged.append(Block(block_id=pending[0].block_id, kind="text", role="paragraph", text=text))
 
 
 def _translate_document(
