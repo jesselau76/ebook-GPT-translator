@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import threading
@@ -118,6 +119,30 @@ def load_gemini_model_choices() -> list[str]:
     return list(GEMINI_MODELS)
 
 
+_CUSTOM_MODELS_PATH = Path(".cache/custom_models.json")
+
+_DEFAULT_MODELS: dict[str, list[str]] = {
+    "codex": [],   # loaded dynamically
+    "claude": list(CLAUDE_CODE_MODELS),
+    "gemini": list(GEMINI_MODELS),
+}
+
+
+def _load_custom_models() -> dict[str, list[str]]:
+    if not _CUSTOM_MODELS_PATH.exists():
+        return {}
+    try:
+        data = json.loads(_CUSTOM_MODELS_PATH.read_text(encoding="utf-8"))
+        return {k: list(v) for k, v in data.items() if isinstance(v, list)}
+    except Exception:
+        return {}
+
+
+def _save_custom_models(custom: dict[str, list[str]]) -> None:
+    _CUSTOM_MODELS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CUSTOM_MODELS_PATH.write_text(json.dumps(custom, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 class TranslatorGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -127,6 +152,7 @@ class TranslatorGUI:
 
         self.queue: Queue[tuple[str, Any]] = Queue()
         self.worker: threading.Thread | None = None
+        self.custom_models = _load_custom_models()
         self.codex_model_choices = load_codex_model_choices()
         self.claude_model_choices = load_claude_model_choices()
         self.gemini_model_choices = load_gemini_model_choices()
@@ -243,7 +269,7 @@ class TranslatorGUI:
             ["codex", "claude", "gemini", "openai", "azure", "compatible", "mock"],
             on_select=lambda _event: self._on_provider_changed(),
         )
-        row = self._combo_field(frame, row, "Model", self.model, self.codex_model_choices)
+        row = self._model_field(frame, row)
         row = self._combo_field(
             frame,
             row,
@@ -401,6 +427,71 @@ class TranslatorGUI:
         if label == "Model":
             self.model_combo = combo
         return row + 1
+
+    def _model_field(self, parent: ttk.Frame, row: int) -> int:
+        ttk.Label(parent, text="Model").grid(row=row, column=0, sticky="w", pady=4, padx=(0, 8))
+        choices = self._get_model_choices(self.provider.get())
+        self.model_combo = ttk.Combobox(parent, textvariable=self.model, values=choices)
+        self.model_combo.grid(row=row, column=1, columnspan=2, sticky="ew", pady=4)
+        btn_frame = ttk.Frame(parent)
+        btn_frame.grid(row=row, column=3, sticky="w", pady=4, padx=(4, 0))
+        ttk.Button(btn_frame, text="+", width=3, command=self._add_custom_model).grid(row=0, column=0)
+        ttk.Button(btn_frame, text="\u2212", width=3, command=self._remove_custom_model).grid(row=0, column=1, padx=(2, 0))
+        # Hint row
+        ttk.Label(parent, text="Type a model name and click + to add, or \u2212 to remove custom models",
+                  foreground="#666666").grid(row=row + 1, column=1, columnspan=3, sticky="w", pady=(0, 4))
+        return row + 2
+
+    def _get_model_choices(self, provider: str) -> list[str]:
+        provider = provider.strip().lower()
+        if provider == "codex":
+            defaults = self.codex_model_choices
+        elif provider == "claude":
+            defaults = self.claude_model_choices
+        elif provider == "gemini":
+            defaults = self.gemini_model_choices
+        elif provider == "mock":
+            return ["gpt-5.2-codex"]
+        else:
+            defaults = [self.model.get() or ""]
+        custom = self.custom_models.get(provider, [])
+        combined = list(defaults)
+        for m in custom:
+            if m and m not in combined:
+                combined.append(m)
+        return combined
+
+    def _add_custom_model(self) -> None:
+        model = self.model.get().strip()
+        if not model:
+            return
+        provider = self.provider.get().strip().lower()
+        existing = self._get_model_choices(provider)
+        if model in existing:
+            self._append_log(f"Model '{model}' already in list.")
+            return
+        custom = self.custom_models.setdefault(provider, [])
+        custom.append(model)
+        _save_custom_models(self.custom_models)
+        self.model_combo.configure(values=self._get_model_choices(provider))
+        self._append_log(f"Added custom model '{model}' for {provider}.")
+
+    def _remove_custom_model(self) -> None:
+        model = self.model.get().strip()
+        if not model:
+            return
+        provider = self.provider.get().strip().lower()
+        custom = self.custom_models.get(provider, [])
+        if model not in custom:
+            self._append_log(f"'{model}' is a built-in model and cannot be removed.")
+            return
+        custom.remove(model)
+        _save_custom_models(self.custom_models)
+        choices = self._get_model_choices(provider)
+        self.model_combo.configure(values=choices)
+        if choices:
+            self.model.set(choices[0])
+        self._append_log(f"Removed custom model '{model}' from {provider}.")
 
     def _spin_field(
         self,
@@ -618,47 +709,36 @@ job_dir = ".cache/jobs"
 
     def _list_models(self) -> None:
         provider = self.provider.get().strip().lower()
+        # Refresh defaults
         if provider == "claude":
-            models = load_claude_model_choices()
-            self.claude_model_choices = models
-            label = "Claude Code"
+            self.claude_model_choices = load_claude_model_choices()
         elif provider == "gemini":
-            models = load_gemini_model_choices()
-            self.gemini_model_choices = models
-            label = "Gemini"
+            self.gemini_model_choices = load_gemini_model_choices()
         else:
-            models = load_codex_model_choices()
-            self.codex_model_choices = models
-            label = "Codex"
+            self.codex_model_choices = load_codex_model_choices()
+        models = self._get_model_choices(provider)
         self.model_combo.configure(values=models)
         if not models:
-            self._append_log(f"No {label} models found.")
+            self._append_log(f"No {provider} models found.")
             return
-        self._append_log(f"{label} models:")
-        for model in models[:20]:
-            self._append_log(f"- {model}")
+        custom = set(self.custom_models.get(provider, []))
+        self._append_log(f"{provider} models:")
+        for model in models[:30]:
+            suffix = " (custom)" if model in custom else ""
+            self._append_log(f"- {model}{suffix}")
 
     def _on_provider_changed(self) -> None:
         provider = self.provider.get().strip().lower()
         if provider == "codex":
             self.codex_model_choices = load_codex_model_choices()
-            self.model_combo.configure(values=self.codex_model_choices)
-            if self.model.get() not in self.codex_model_choices and self.codex_model_choices:
-                self.model.set(self.codex_model_choices[0])
         elif provider == "claude":
             self.claude_model_choices = load_claude_model_choices()
-            self.model_combo.configure(values=self.claude_model_choices)
-            if self.model.get() not in self.claude_model_choices and self.claude_model_choices:
-                self.model.set(self.claude_model_choices[0])
         elif provider == "gemini":
             self.gemini_model_choices = load_gemini_model_choices()
-            self.model_combo.configure(values=self.gemini_model_choices)
-            if self.model.get() not in self.gemini_model_choices and self.gemini_model_choices:
-                self.model.set(self.gemini_model_choices[0])
-        elif provider == "mock":
-            self.model_combo.configure(values=["gpt-5.2-codex"])
-        else:
-            self.model_combo.configure(values=[self.model.get() or ""])
+        choices = self._get_model_choices(provider)
+        self.model_combo.configure(values=choices)
+        if self.model.get() not in choices and choices:
+            self.model.set(choices[0])
         self._refresh_resume_status()
 
     def _start_translation(self, resume_only: bool = False) -> None:
