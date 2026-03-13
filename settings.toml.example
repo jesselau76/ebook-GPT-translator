@@ -22,8 +22,8 @@ preserve_line_breaks = true
 context_window_blocks = 6
 
 [chunking]
-max_chars = 1800
-max_tokens = 1200
+max_chars = 5000
+max_tokens = 3500
 test_limit = 3
 
 [input]

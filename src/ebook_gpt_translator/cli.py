@@ -436,8 +436,8 @@ preserve_line_breaks = true
 context_window_blocks = 4
 
 [chunking]
-max_chars = 1800
-max_tokens = 1200
+max_chars = 5000
+max_tokens = 3500
 test_limit = 3
 
 [input]
@@ -476,8 +476,8 @@ language = Simplified Chinese
 bilingual-output = false
 prompt = Please translate the following text into Simplified Chinese.
 context-window-blocks = 4
-max_len = 1800
-max_token = 1200
+max_len = 5000
+max_token = 3500
 startpage = 1
 endpage = -1
 transliteration-list = transliteration-list-example.xlsx

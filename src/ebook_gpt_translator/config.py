@@ -42,8 +42,8 @@ class TranslationConfig:
 
 @dataclass(slots=True)
 class ChunkConfig:
-    max_chars: int = 1800
-    max_tokens: int = 1200
+    max_chars: int = 5000
+    max_tokens: int = 3500
     test_limit: int = 3
 
 
@@ -158,8 +158,8 @@ def _legacy_to_dict(parser: configparser.ConfigParser) -> dict[str, dict[str, An
             ),
         },
         "chunking": {
-            "max_chars": _as_int(settings.get("max_len", settings.get("max_chars", "")), 1800),
-            "max_tokens": _as_int(settings.get("max_token", settings.get("max_tokens", "")), 1200),
+            "max_chars": _as_int(settings.get("max_len", settings.get("max_chars", "")), 5000),
+            "max_tokens": _as_int(settings.get("max_token", settings.get("max_tokens", "")), 3500),
         },
         "input": {
             "start_page": _as_int(settings.get("startpage", settings.get("start_page", "")), 1),
