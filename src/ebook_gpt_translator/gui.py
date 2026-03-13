@@ -728,10 +728,13 @@ class TranslatorGUI:
             return text or "installed"
         if cli_name == "claude":
             completed = subprocess.run(
-                [cli_path, "-p", "ping", "--output-format", "json", "--max-turns", "1"],
-                text=True, capture_output=True, check=False, timeout=15,
+                [cli_path, "--version"],
+                text=True, capture_output=True, check=False, timeout=5,
             )
-            return "ready" if completed.returncode == 0 else "installed (check auth)"
+            if completed.returncode == 0:
+                version = (completed.stdout or "").strip()
+                return f"ready ({version})" if version else "ready"
+            return "installed (check auth)"
         if cli_name == "gemini":
             completed = subprocess.run(
                 [cli_path, "-v"],
