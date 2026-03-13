@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -138,6 +139,34 @@ def _strip_markdown_fences(text: str) -> str:
     return stripped.strip()
 
 
+_TRANSLATION_RE = re.compile(r'"translation"\s*:\s*"((?:[^"\\]|\\.)*)"', re.DOTALL)
+
+
+def _regex_extract_translation(text: str) -> str:
+    """Regex fallback: extract the value of a ``"translation": "..."`` field."""
+    match = _TRANSLATION_RE.search(text)
+    if not match:
+        return ""
+    value = match.group(1)
+    value = value.replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\")
+    return value.strip()
+
+
+def _clean_json_artifacts(text: str) -> str:
+    """Remove stray JSON wrapper fragments from translation output."""
+    cleaned = text.strip()
+    # Full JSON wrapper: {"translation": "..."}
+    match = re.match(r'^\s*\{\s*"translation"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}\s*$', cleaned, re.DOTALL)
+    if match:
+        value = match.group(1)
+        return value.replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\").strip()
+    # Trailing JSON close: text ending with "\n} or "}
+    cleaned = re.sub(r'["\s]*\}\s*$', '', cleaned).strip()
+    # Leading JSON open: {"translation": " at start
+    cleaned = re.sub(r'^\s*\{\s*"translation"\s*:\s*"?', '', cleaned).strip()
+    return cleaned
+
+
 class CodexCLIProvider(BaseProvider):
     max_empty_retries = 3
 
@@ -248,6 +277,10 @@ class CodexCLIProvider(BaseProvider):
                 translation = str(parsed.get("translation", "")).strip()
                 if translation:
                     return translation
+            # Regex fallback for malformed JSON (unescaped chars in translation)
+            translation = _regex_extract_translation(candidate)
+            if translation:
+                return translation
         return ""
 
     @staticmethod
@@ -342,8 +375,13 @@ class ClaudeCodeCLIProvider(BaseProvider):
                     translation = str(inner.get("translation", "")).strip()
                     if translation:
                         return translation
-                # Fall back to raw result text (strip markdown fences)
-                return _strip_markdown_fences(result)
+                # Regex fallback for malformed JSON
+                translation = _regex_extract_translation(result)
+                if translation:
+                    return translation
+                # Fall back to raw result text, clean JSON artifacts
+                cleaned = _strip_markdown_fences(result)
+                return _clean_json_artifacts(cleaned)
             # Direct translation JSON (unlikely but handle it)
             translation = str(envelope.get("translation", "")).strip()
             if translation:
@@ -434,8 +472,13 @@ class GeminiCLIProvider(BaseProvider):
                     translation = str(inner.get("translation", "")).strip()
                     if translation:
                         return translation
-                # Fall back to raw response text (strip markdown fences)
-                return _strip_markdown_fences(response)
+                # Regex fallback for malformed JSON
+                translation = _regex_extract_translation(response)
+                if translation:
+                    return translation
+                # Fall back to raw response text, clean JSON artifacts
+                cleaned = _strip_markdown_fences(response)
+                return _clean_json_artifacts(cleaned)
             # Direct translation JSON
             translation = str(envelope.get("translation", "")).strip()
             if translation:
