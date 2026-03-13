@@ -1,6 +1,6 @@
 # ebook-GPT-translator
 
-Modernized ebook translation toolkit for TXT, EPUB, DOCX, PDF, and optional MOBI input. This version upgrades the original single-file project into a package with a real CLI, modern OpenAI SDK support, Azure/OpenAI-compatible providers, resume cache, glossary handling, tests, and release-ready packaging.
+Modernized ebook translation toolkit for TXT, EPUB, DOCX, PDF, and optional MOBI input. Supports Codex, Claude Code, and Gemini CLI as local translation providers alongside OpenAI/Azure APIs. This version upgrades the original single-file project into a package with a real CLI, modern OpenAI SDK support, multi-provider support, resume cache, glossary handling, tests, and release-ready packaging.
 
 [中文说明](README-zh.md)
 
@@ -24,6 +24,8 @@ Direct link: [ebook.gif](./ebook.gif)
 ## Supported providers
 
 - `codex`: local Codex CLI using your ChatGPT subscription login
+- `claude`: Claude Code CLI using your Anthropic account (models: `claude-sonnet-4-6`, `claude-opus-4-6`, `claude-haiku-4-5-20251001`)
+- `gemini`: Gemini CLI using your Google account (models: `gemini-3-pro-preview`, `gemini-3-flash-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`)
 - `openai`: official OpenAI API
 - `azure`: Azure OpenAI deployment
 - `compatible`: any OpenAI-compatible endpoint, including Venice.ai-style APIs
@@ -79,11 +81,12 @@ GUI notes:
 
 - `Config file` is optional. Leave it empty to use the values currently selected in the GUI.
 - Use a config file when you want to save a repeatable preset for provider, language, context window, and output options.
-- The `Model` field in the GUI is a dropdown loaded from your local Codex model cache.
+- The `Model` field in the GUI is a dropdown that updates automatically when you switch providers (Codex, Claude Code, or Gemini models).
 - The `Target language` field in the GUI is a common-language dropdown, but you can still type a custom language.
 - The GUI includes a `Custom prompt` box for style instructions such as `Translate into Chinese in a Dream of the Red Chamber style.`
 - The GUI now shows live progress for both blocks and chunked sub-steps, so long files no longer appear frozen during translation.
-- The GUI includes `Check resume` and `Resume previous job` actions. If Codex is interrupted, rerun the same file and settings to continue from cached chunks while rebuilding the same consistency state.
+- The GUI includes `Check resume` and `Resume previous job` actions. If translation is interrupted, rerun the same file and settings to continue from cached chunks while rebuilding the same consistency state.
+- The GUI includes a `CLI Tools` panel showing install/auth status for Codex, Claude Code, and Gemini CLI with one-click login for each.
 
 Run a real translation:
 
@@ -104,6 +107,26 @@ PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
   --provider codex \
   --model gpt-5.2-codex \
   --reasoning-effort medium \
+  --target-language "Simplified Chinese"
+```
+
+Run with Claude Code:
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider claude
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider claude \
+  --model claude-sonnet-4-6 \
+  --target-language "Simplified Chinese"
+```
+
+Run with Gemini CLI:
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider gemini
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider gemini \
+  --model gemini-2.5-pro \
   --target-language "Simplified Chinese"
 ```
 
@@ -140,10 +163,12 @@ Use Codex login status:
 PYTHONPATH=src python3 -m ebook_gpt_translator auth status
 ```
 
-List local Codex models:
+List available models:
 
 ```bash
-PYTHONPATH=src python3 -m ebook_gpt_translator list-models
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source codex
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source claude
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source gemini
 ```
 
 Use the legacy entrypoint:
@@ -183,7 +208,7 @@ api_mode = "chat"
 - Glossary CSV and XLSX files let you pin terminology before sending text to the model
 - Chapter memory, rolling translated context, and automatic term memory are included by default to improve long-novel consistency
 - Translation memory is persisted in `.cache/jobs/*.memory.json` for cross-chapter reuse and restarts
-- The Codex provider now requests structured JSON output and parses the `translation` field, with automatic retry on empty structured responses
+- All CLI providers (Codex, Claude Code, Gemini) request structured JSON output and parse the `translation` field, with automatic retry on empty responses
 - `--txt-only` and `--epub-only` support lighter workflows
 - Generated manifest files record outputs, config, and usage stats
 

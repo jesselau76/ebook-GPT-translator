@@ -1,6 +1,6 @@
 # ebook-GPT-translator
 
-这是一个完成现代化升级后的电子书翻译工具，支持 TXT、EPUB、DOCX、PDF，以及可选的 MOBI 输入。新版本不再依赖旧的单文件脚本模式，而是重构为可维护的 Python 包，补上现代 OpenAI SDK、Azure/OpenAI-compatible provider、断点续跑缓存、术语表、测试和发布基础。
+这是一个完成现代化升级后的电子书翻译工具，支持 TXT、EPUB、DOCX、PDF，以及可选的 MOBI 输入。支持 Codex、Claude Code、Gemini CLI 三种本地 CLI 翻译引擎，同时兼容 OpenAI/Azure API。新版本不再依赖旧的单文件脚本模式，而是重构为可维护的 Python 包，补上现代 OpenAI SDK、多 provider 支持、断点续跑缓存、术语表、测试和发布基础。
 
 [English README](README.md)
 
@@ -24,6 +24,8 @@
 ## 支持的 provider
 
 - `codex`：本机 Codex CLI，直接复用 ChatGPT subscription 登录态
+- `claude`：Claude Code CLI，使用 Anthropic 账号（模型：`claude-sonnet-4-6`、`claude-opus-4-6`、`claude-haiku-4-5-20251001`）
+- `gemini`：Gemini CLI，使用 Google 账号（模型：`gemini-3-pro-preview`、`gemini-3-flash-preview`、`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-2.5-flash-lite`）
 - `openai`：官方 OpenAI API
 - `azure`：Azure OpenAI 部署
 - `compatible`：任意 OpenAI-compatible 接口，包括 Venice.ai 这类第三方服务
@@ -79,11 +81,12 @@ GUI 说明：
 
 - `Config file` 是可选项。不填时，直接使用 GUI 当前表单里的设置。
 - 如果你想保存一套固定预设，比如 provider、语言、上下文窗口、输出选项，再使用 config file。
-- GUI 里的 `Model` 现在是下拉列表，会从你本机的 Codex 模型缓存里读取。
+- GUI 里的 `Model` 是下拉列表，切换 provider 时会自动更新对应的模型列表（Codex、Claude Code、Gemini）。
 - GUI 里的 `Target language` 现在是常用语言下拉，同时也保留手动输入。
 - GUI 里有 `Custom prompt` 输入框，可以直接写类似 `用红楼梦的风格翻译成中文` 的要求。
 - GUI 现在会实时显示 block 和 chunk 两层进度，大文件翻译时不会再像卡死一样没有反馈。
-- GUI 现在提供 `Check resume` 和 `Resume previous job`。如果 Codex 中途断掉，用同一文件和同一组设置重开任务，就会继续复用已完成 chunk 的缓存，并重建一致性上下文。
+- GUI 现在提供 `Check resume` 和 `Resume previous job`。如果翻译中途断掉，用同一文件和同一组设置重开任务，就会继续复用已完成 chunk 的缓存，并重建一致性上下文。
+- GUI 新增 `CLI Tools` 面板，显示 Codex、Claude Code、Gemini CLI 三个工具的安装/认证状态，支持一键登录。
 
 真实翻译：
 
@@ -104,6 +107,26 @@ PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
   --provider codex \
   --model gpt-5.2-codex \
   --reasoning-effort medium \
+  --target-language "Simplified Chinese"
+```
+
+使用 Claude Code 翻译：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider claude
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider claude \
+  --model claude-sonnet-4-6 \
+  --target-language "Simplified Chinese"
+```
+
+使用 Gemini CLI 翻译：
+
+```bash
+PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider gemini
+PYTHONPATH=src python3 -m ebook_gpt_translator translate book.epub \
+  --provider gemini \
+  --model gemini-2.5-pro \
   --target-language "Simplified Chinese"
 ```
 
@@ -140,10 +163,12 @@ PYTHONPATH=src python3 -m ebook_gpt_translator auth login --provider openai
 PYTHONPATH=src python3 -m ebook_gpt_translator auth status
 ```
 
-列出本机可用的 Codex 模型：
+列出可用模型：
 
 ```bash
-PYTHONPATH=src python3 -m ebook_gpt_translator list-models
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source codex
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source claude
+PYTHONPATH=src python3 -m ebook_gpt_translator list-models --source gemini
 ```
 
 兼容旧入口：
@@ -161,7 +186,7 @@ PYTHONPATH=src python3 text_translation.py translate sample.txt --provider mock
 - 术语替换：通过 CSV 或 XLSX glossary 支持，兼容原仓库样例
 - 长篇一致性：默认携带章节记忆、前文已翻译上下文和术语记忆，帮助维持人名、地名、称谓和语气统一
 - 翻译记忆会保存到 `.cache/jobs/*.memory.json`，便于跨章节和断点重跑继续复用
-- Codex provider 现在会强制请求结构化 JSON，并只解析 `translation` 字段；遇到空结果会自动重试
+- 所有 CLI provider（Codex、Claude Code、Gemini）均请求结构化 JSON，并只解析 `translation` 字段；遇到空结果会自动重试
 
 ## 开发与测试
 
