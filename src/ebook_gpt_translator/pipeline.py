@@ -192,7 +192,15 @@ def _translate_document(
     system_prompt = _build_system_prompt(config, glossary)
     text_blocks = document.iter_text_blocks()
     if config.runtime.test_mode:
-        text_blocks = text_blocks[: config.chunking.test_limit]
+        char_limit = config.chunking.test_limit * config.chunking.max_chars
+        selected: list[tuple] = []
+        total_chars = 0
+        for pair in text_blocks:
+            selected.append(pair)
+            total_chars += len(pair[1].text)
+            if total_chars >= char_limit:
+                break
+        text_blocks = selected
     recent_blocks: deque[tuple[str, str]] = deque(
         memory_state["recent_blocks"],
         maxlen=max(0, config.translation.context_window_blocks),
