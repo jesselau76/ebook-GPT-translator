@@ -719,31 +719,18 @@ class TranslatorGUI:
         cli_path = shutil.which(cli_name)
         if not cli_path:
             return "not found"
-        if cli_name == "codex":
+        version_flag = "-v" if cli_name == "gemini" else "--version"
+        try:
             completed = subprocess.run(
-                [cli_path, "login", "status"],
-                text=True, capture_output=True, check=False,
-            )
-            text = (completed.stdout or completed.stderr).strip()
-            return text or "installed"
-        if cli_name == "claude":
-            completed = subprocess.run(
-                [cli_path, "--version"],
+                [cli_path, version_flag],
                 text=True, capture_output=True, check=False, timeout=5,
             )
-            if completed.returncode == 0:
-                version = (completed.stdout or "").strip()
-                return f"ready ({version})" if version else "ready"
-            return "installed (check auth)"
-        if cli_name == "gemini":
-            completed = subprocess.run(
-                [cli_path, "-v"],
-                text=True, capture_output=True, check=False, timeout=10,
-            )
-            if completed.returncode == 0:
-                version = (completed.stdout or "").strip()
-                return f"ready ({version})" if version else "ready"
-            return "installed (check auth)"
+        except subprocess.TimeoutExpired:
+            return "installed (timeout)"
+        if completed.returncode == 0:
+            version = (completed.stdout or "").strip()
+            return f"ready ({version})" if version else "ready"
+        return "installed (check auth)"
         return "unknown"
 
 
