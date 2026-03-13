@@ -86,6 +86,16 @@ def build_config_from_form(form: dict[str, Any]) -> AppConfig:
     return config
 
 
+CLAUDE_CODE_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"]
+GEMINI_MODELS = [
+    "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
+
+
 def load_codex_model_choices() -> list[str]:
     try:
         from ebook_gpt_translator.cli import _load_codex_models
@@ -100,6 +110,14 @@ def load_codex_model_choices() -> list[str]:
     return preferred + fallback or ["gpt-5.2-codex", "gpt-5.1-codex", "gpt-5-codex-mini"]
 
 
+def load_claude_model_choices() -> list[str]:
+    return list(CLAUDE_CODE_MODELS)
+
+
+def load_gemini_model_choices() -> list[str]:
+    return list(GEMINI_MODELS)
+
+
 class TranslatorGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -110,6 +128,8 @@ class TranslatorGUI:
         self.queue: Queue[tuple[str, Any]] = Queue()
         self.worker: threading.Thread | None = None
         self.codex_model_choices = load_codex_model_choices()
+        self.claude_model_choices = load_claude_model_choices()
+        self.gemini_model_choices = load_gemini_model_choices()
 
         self.file_path = tk.StringVar()
         self.config_path = tk.StringVar()
@@ -142,7 +162,9 @@ class TranslatorGUI:
         self.progress_value = tk.DoubleVar(value=0.0)
         self.progress_detail = tk.StringVar(value="No active translation.")
         self.resume_status = tk.StringVar(value="Resume status unavailable.")
-        self.codex_status = tk.StringVar(value=self._get_codex_status())
+        self.codex_status = tk.StringVar(value=self._get_cli_status("codex"))
+        self.claude_status = tk.StringVar(value=self._get_cli_status("claude"))
+        self.gemini_status = tk.StringVar(value=self._get_cli_status("gemini"))
 
         self._build_layout()
         self.root.after(150, self._process_queue)
@@ -218,7 +240,7 @@ class TranslatorGUI:
             row,
             "Provider",
             self.provider,
-            ["codex", "openai", "azure", "compatible", "mock"],
+            ["codex", "claude", "gemini", "openai", "azure", "compatible", "mock"],
             on_select=lambda _event: self._on_provider_changed(),
         )
         row = self._combo_field(frame, row, "Model", self.model, self.codex_model_choices)
@@ -281,14 +303,20 @@ class TranslatorGUI:
         )
 
         row += 1
-        codex_box = ttk.LabelFrame(frame, text="Codex", padding=10)
-        codex_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
-        codex_box.columnconfigure(1, weight=1)
-        ttk.Label(codex_box, text="Status").grid(row=0, column=0, sticky="w")
-        ttk.Label(codex_box, textvariable=self.codex_status).grid(row=0, column=1, sticky="w")
-        ttk.Button(codex_box, text="Refresh", command=self._refresh_codex_status).grid(row=0, column=2, padx=4)
-        ttk.Button(codex_box, text="List models", command=self._list_models).grid(row=0, column=3, padx=4)
-        ttk.Button(codex_box, text="Run codex login", command=self._run_codex_login).grid(row=0, column=4, padx=4)
+        cli_box = ttk.LabelFrame(frame, text="CLI Tools", padding=10)
+        cli_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        cli_box.columnconfigure(1, weight=1)
+        ttk.Label(cli_box, text="Codex").grid(row=0, column=0, sticky="w")
+        ttk.Label(cli_box, textvariable=self.codex_status).grid(row=0, column=1, sticky="w", padx=4)
+        ttk.Button(cli_box, text="Login", command=self._run_codex_login).grid(row=0, column=2, padx=4)
+        ttk.Label(cli_box, text="Claude").grid(row=1, column=0, sticky="w")
+        ttk.Label(cli_box, textvariable=self.claude_status).grid(row=1, column=1, sticky="w", padx=4)
+        ttk.Button(cli_box, text="Login", command=self._run_claude_login).grid(row=1, column=2, padx=4)
+        ttk.Label(cli_box, text="Gemini").grid(row=2, column=0, sticky="w")
+        ttk.Label(cli_box, textvariable=self.gemini_status).grid(row=2, column=1, sticky="w", padx=4)
+        ttk.Button(cli_box, text="Login", command=self._run_gemini_login).grid(row=2, column=2, padx=4)
+        ttk.Button(cli_box, text="Refresh", command=self._refresh_cli_status).grid(row=3, column=0, padx=4, pady=(6, 0))
+        ttk.Button(cli_box, text="List models", command=self._list_models).grid(row=3, column=1, sticky="w", padx=4, pady=(6, 0))
 
         row += 1
         actions = ttk.Frame(frame, padding=(0, 12, 0, 0))
@@ -440,20 +468,33 @@ class TranslatorGUI:
             self._append_log(f"Output directory: {output_dir}")
 
     def _run_codex_login(self) -> None:
-        cmd = shutil.which("codex")
+        self._run_cli_login("codex", "codex", "codex login")
+
+    def _run_claude_login(self) -> None:
+        self._run_cli_login("claude", "Claude Code", "claude")
+
+    def _run_gemini_login(self) -> None:
+        self._run_cli_login("gemini", "Gemini", "gemini auth login")
+
+    def _run_cli_login(self, cli_name: str, display_name: str, login_cmd: str) -> None:
+        cmd = shutil.which(cli_name)
         if not cmd:
-            messagebox.showerror("Codex not found", "Codex CLI was not found in PATH.")
+            messagebox.showerror(f"{display_name} not found", f"{display_name} CLI was not found in PATH.")
             return
         terminal = _detect_terminal()
         if terminal:
-            subprocess.Popen([*terminal, f"{cmd} login"])
-            self._append_log("Launched `codex login` in an external terminal.")
+            subprocess.Popen([*terminal, login_cmd])
+            self._append_log(f"Launched `{login_cmd}` in an external terminal.")
         else:
-            messagebox.showinfo("Run in terminal", "No terminal emulator detected. Run `codex login` in your shell.")
+            messagebox.showinfo("Run in terminal", f"No terminal emulator detected. Run `{login_cmd}` in your shell.")
 
-    def _refresh_codex_status(self) -> None:
-        self.codex_status.set(self._get_codex_status())
-        self._append_log(f"Codex status: {self.codex_status.get()}")
+    def _refresh_cli_status(self) -> None:
+        self.codex_status.set(self._get_cli_status("codex"))
+        self.claude_status.set(self._get_cli_status("claude"))
+        self.gemini_status.set(self._get_cli_status("gemini"))
+        self._append_log(f"Codex: {self.codex_status.get()}")
+        self._append_log(f"Claude: {self.claude_status.get()}")
+        self._append_log(f"Gemini: {self.gemini_status.get()}")
 
     def _refresh_resume_status(self, log_message: bool = False) -> None:
         form = self._collect_form()
@@ -475,13 +516,24 @@ class TranslatorGUI:
             self._append_log(message)
 
     def _list_models(self) -> None:
-        self.codex_model_choices = load_codex_model_choices()
-        self.model_combo.configure(values=self.codex_model_choices)
-        models = self.codex_model_choices
+        provider = self.provider.get().strip().lower()
+        if provider == "claude":
+            models = load_claude_model_choices()
+            self.claude_model_choices = models
+            label = "Claude Code"
+        elif provider == "gemini":
+            models = load_gemini_model_choices()
+            self.gemini_model_choices = models
+            label = "Gemini"
+        else:
+            models = load_codex_model_choices()
+            self.codex_model_choices = models
+            label = "Codex"
+        self.model_combo.configure(values=models)
         if not models:
-            self._append_log("No Codex model cache found.")
+            self._append_log(f"No {label} models found.")
             return
-        self._append_log("Codex models:")
+        self._append_log(f"{label} models:")
         for model in models[:20]:
             self._append_log(f"- {model}")
 
@@ -492,6 +544,16 @@ class TranslatorGUI:
             self.model_combo.configure(values=self.codex_model_choices)
             if self.model.get() not in self.codex_model_choices and self.codex_model_choices:
                 self.model.set(self.codex_model_choices[0])
+        elif provider == "claude":
+            self.claude_model_choices = load_claude_model_choices()
+            self.model_combo.configure(values=self.claude_model_choices)
+            if self.model.get() not in self.claude_model_choices and self.claude_model_choices:
+                self.model.set(self.claude_model_choices[0])
+        elif provider == "gemini":
+            self.gemini_model_choices = load_gemini_model_choices()
+            self.model_combo.configure(values=self.gemini_model_choices)
+            if self.model.get() not in self.gemini_model_choices and self.gemini_model_choices:
+                self.model.set(self.gemini_model_choices[0])
         elif provider == "mock":
             self.model_combo.configure(values=["gpt-5.2-codex"])
         else:
@@ -592,7 +654,7 @@ class TranslatorGUI:
                         + ", ".join(f"{key}={value}" for key, value in payload["stats"].items())
                     )
                     self._refresh_resume_status()
-                    self._refresh_codex_status()
+                    self._refresh_cli_status()
                 elif kind == "error":
                     self.status_text.set("Failed")
                     self.progress_detail.set("Translation failed.")
@@ -652,18 +714,34 @@ class TranslatorGUI:
         self.log_widget.see("end")
         self.log_widget.configure(state="disabled")
 
-    def _get_codex_status(self) -> str:
-        codex_path = shutil.which("codex")
-        if not codex_path:
-            return "Codex CLI not found"
-        completed = subprocess.run(
-            [codex_path, "login", "status"],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        text = (completed.stdout or completed.stderr).strip()
-        return text or "Status unavailable"
+    @staticmethod
+    def _get_cli_status(cli_name: str) -> str:
+        cli_path = shutil.which(cli_name)
+        if not cli_path:
+            return "not found"
+        if cli_name == "codex":
+            completed = subprocess.run(
+                [cli_path, "login", "status"],
+                text=True, capture_output=True, check=False,
+            )
+            text = (completed.stdout or completed.stderr).strip()
+            return text or "installed"
+        if cli_name == "claude":
+            completed = subprocess.run(
+                [cli_path, "-p", "ping", "--output-format", "json", "--max-turns", "1"],
+                text=True, capture_output=True, check=False, timeout=15,
+            )
+            return "ready" if completed.returncode == 0 else "installed (check auth)"
+        if cli_name == "gemini":
+            completed = subprocess.run(
+                [cli_path, "--version"],
+                text=True, capture_output=True, check=False, timeout=10,
+            )
+            if completed.returncode == 0:
+                version = (completed.stdout or "").strip()
+                return f"ready ({version})" if version else "ready"
+            return "installed (check auth)"
+        return "unknown"
 
 
 def _detect_terminal() -> list[str] | None:

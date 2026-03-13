@@ -1,5 +1,7 @@
 [provider]
+# kind: codex, claude, gemini, openai, azure, compatible, or mock
 kind = "codex"
+# model examples: gpt-5.2-codex (codex), claude-sonnet-4-6 (claude), gemini-3-pro-preview (gemini)
 model = "gpt-5.2-codex"
 reasoning_effort = "medium"
 api_key = ""

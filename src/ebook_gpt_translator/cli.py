@@ -23,7 +23,7 @@ def translate(
     input_path: Path = typer.Argument(..., exists=True, readable=True, help="Source ebook or text file."),
     config_path: str = typer.Option("", "--config", "-c", help="Path to settings.toml or legacy settings.cfg."),
     env_file: str = typer.Option("", "--env-file", help="Optional .env file."),
-    provider: str = typer.Option(None, "--provider", help="codex, openai, azure, compatible, or mock."),
+    provider: str = typer.Option(None, "--provider", help="codex, claude, gemini, openai, azure, compatible, or mock."),
     model: str = typer.Option(None, "--model", help="Model, Codex model slug, or Azure deployment name."),
     reasoning_effort: str = typer.Option(
         None,
@@ -111,12 +111,31 @@ def list_models(
     source: str = typer.Option(
         "codex",
         "--source",
-        help="Model catalog source. Currently only `codex` is supported.",
+        help="Model catalog source: codex, claude, or gemini.",
     ),
-    show_all: bool = typer.Option(False, "--all", help="Show all visible Codex models."),
+    show_all: bool = typer.Option(False, "--all", help="Show all visible models."),
 ) -> None:
+    if source == "claude":
+        models = _load_claude_models()
+        if not models:
+            console.print("No Claude Code models available.")
+            raise typer.Exit(1)
+        for model in models:
+            console.print(model)
+        return
+
+    if source == "gemini":
+        models = _load_gemini_models()
+        if not models:
+            console.print("No Gemini models available.")
+            raise typer.Exit(1)
+        for model in models:
+            console.print(model)
+        return
+
     if source != "codex":
-        raise typer.BadParameter("Only `codex` is currently supported.")
+        raise typer.BadParameter("source must be one of: codex, claude, gemini")
+
     models = _load_codex_models()
     if not models:
         console.print("No Codex model cache found. Run `codex login` first.")
@@ -141,7 +160,7 @@ def list_models(
 @auth_app.command("login")
 def auth_login(
     env_file: Path = typer.Option(Path(".env"), "--env-file", help="Where to store credentials."),
-    provider: str = typer.Option("openai", "--provider", help="codex, openai, azure, or compatible."),
+    provider: str = typer.Option("openai", "--provider", help="codex, claude, gemini, openai, azure, or compatible."),
     api_key: str = typer.Option("", "--api-key", help="API key. Prompted if omitted."),
     api_base_url: str = typer.Option("", "--api-base-url", help="Custom base URL or Azure endpoint."),
     api_version: str = typer.Option("", "--api-version", help="Azure API version."),
@@ -154,13 +173,18 @@ def auth_login(
     target_language: str = typer.Option("", "--target-language", help="Optional default target language."),
 ) -> None:
     normalized_provider = provider.strip().lower()
-    if normalized_provider not in {"codex", "openai", "azure", "compatible"}:
-        raise typer.BadParameter("provider must be one of: codex, openai, azure, compatible")
+    if normalized_provider not in {"codex", "claude", "gemini", "openai", "azure", "compatible"}:
+        raise typer.BadParameter("provider must be one of: codex, claude, gemini, openai, azure, compatible")
 
-    if normalized_provider == "codex":
-        _run_codex_command(["login"])
+    if normalized_provider in {"codex", "claude", "gemini"}:
+        if normalized_provider == "codex":
+            _run_codex_command(["login"])
+        elif normalized_provider == "claude":
+            _run_claude_command([])
+        elif normalized_provider == "gemini":
+            _run_gemini_command(["auth", "login"])
         values = _read_env_file(env_file)
-        values["EBOOK_TRANSLATOR_PROVIDER"] = "codex"
+        values["EBOOK_TRANSLATOR_PROVIDER"] = normalized_provider
         values.pop("EBOOK_TRANSLATOR_API_KEY", None)
         values.pop("EBOOK_TRANSLATOR_API_BASE_URL", None)
         values.pop("EBOOK_TRANSLATOR_API_VERSION", None)
@@ -176,7 +200,7 @@ def auth_login(
             values["EBOOK_TRANSLATOR_TARGET_LANGUAGE"] = target_language.strip()
         _write_env_values(env_file, values)
         console.print(f"Saved provider selection to {env_file}")
-        console.print("Codex login completed. You can now translate with --provider codex.")
+        console.print(f"{normalized_provider.capitalize()} login completed. You can now translate with --provider {normalized_provider}.")
         return
 
     if not api_key:
@@ -223,12 +247,27 @@ def auth_status(
     if codex_path:
         completed = subprocess.run(
             [codex_path, "login", "status"],
-            text=True,
-            capture_output=True,
-            check=False,
+            text=True, capture_output=True, check=False,
         )
         status_text = (completed.stdout or completed.stderr).strip()
         console.print(f"Codex CLI: {status_text or 'status unavailable'}")
+    else:
+        console.print("Codex CLI: not found")
+    claude_path = shutil.which("claude")
+    if claude_path:
+        console.print("Claude Code CLI: installed")
+    else:
+        console.print("Claude Code CLI: not found")
+    gemini_path = shutil.which("gemini")
+    if gemini_path:
+        completed = subprocess.run(
+            [gemini_path, "--version"],
+            text=True, capture_output=True, check=False, timeout=10,
+        )
+        version = (completed.stdout or "").strip()
+        console.print(f"Gemini CLI: installed ({version})" if version else "Gemini CLI: installed")
+    else:
+        console.print("Gemini CLI: not found")
 
 
 @auth_app.command("logout")
@@ -239,6 +278,8 @@ def auth_logout(
     normalized_provider = provider.strip().lower()
     if normalized_provider == "codex":
         _run_codex_command(["logout"])
+    elif normalized_provider == "gemini":
+        _run_gemini_command(["auth", "logout"])
 
     keys = {
         "EBOOK_TRANSLATOR_PROVIDER",
@@ -331,6 +372,24 @@ def _run_codex_command(args: list[str]) -> None:
         raise typer.Exit(completed.returncode)
 
 
+def _run_claude_command(args: list[str]) -> None:
+    claude_path = shutil.which("claude")
+    if claude_path is None:
+        raise typer.BadParameter("Claude Code CLI was not found in PATH.")
+    completed = subprocess.run([claude_path, *args], check=False)
+    if completed.returncode != 0:
+        raise typer.Exit(completed.returncode)
+
+
+def _run_gemini_command(args: list[str]) -> None:
+    gemini_path = shutil.which("gemini")
+    if gemini_path is None:
+        raise typer.BadParameter("Gemini CLI was not found in PATH.")
+    completed = subprocess.run([gemini_path, *args], check=False)
+    if completed.returncode != 0:
+        raise typer.Exit(completed.returncode)
+
+
 def _load_codex_models() -> list[dict]:
     cache_path = Path.home() / ".codex" / "models_cache.json"
     if not cache_path.exists():
@@ -339,8 +398,24 @@ def _load_codex_models() -> list[dict]:
     return data.get("models", [])
 
 
+def _load_claude_models() -> list[str]:
+    return ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"]
+
+
+def _load_gemini_models() -> list[str]:
+    return [
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+    ]
+
+
 TOML_CONFIG_EXAMPLE = """[provider]
+# kind: codex, claude, gemini, openai, azure, compatible, or mock
 kind = "codex"
+# model examples: gpt-5.2-codex (codex), claude-sonnet-4-6 (claude), gemini-3-pro-preview (gemini)
 model = "gpt-5.2-codex"
 reasoning_effort = "medium"
 api_key = ""

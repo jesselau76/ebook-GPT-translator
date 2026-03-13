@@ -110,6 +110,34 @@ class OpenAICompatibleProvider(BaseProvider):
         )
 
 
+def _parse_json_payload(payload: str) -> dict[str, Any] | None:
+    """Try to parse *payload* as JSON, falling back to brace-extraction."""
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        try:
+            parsed = json.loads(payload[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Remove surrounding markdown code fences if present."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        first_nl = stripped.find("\n")
+        if first_nl != -1:
+            stripped = stripped[first_nl + 1:]
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+    return stripped.strip()
+
+
 class CodexCLIProvider(BaseProvider):
     max_empty_retries = 3
 
@@ -224,18 +252,180 @@ class CodexCLIProvider(BaseProvider):
 
     @staticmethod
     def _parse_json_payload(payload: str) -> dict[str, Any] | None:
-        try:
-            parsed = json.loads(payload)
-        except json.JSONDecodeError:
-            start = payload.find("{")
-            end = payload.rfind("}")
-            if start == -1 or end == -1 or end <= start:
-                return None
-            try:
-                parsed = json.loads(payload[start : end + 1])
-            except json.JSONDecodeError:
-                return None
-        return parsed if isinstance(parsed, dict) else None
+        return _parse_json_payload(payload)
+
+
+class ClaudeCodeCLIProvider(BaseProvider):
+    """Translation provider using the Claude Code CLI (``claude``)."""
+
+    max_empty_retries = 3
+
+    def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
+        self.provider_config = provider
+        self.translation_config = translation
+        self.claude_command = shutil.which("claude")
+        if self.claude_command is None:
+            raise RuntimeError(
+                "Claude Code CLI was not found in PATH. "
+                "Install Claude Code (https://docs.anthropic.com/en/docs/claude-code) first."
+            )
+
+    def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
+        prompt = self._build_structured_prompt(system_prompt, user_prompt or text)
+        cmd = [
+            self.claude_command,
+            "-p",
+            prompt,
+            "--output-format",
+            "json",
+            "--max-turns",
+            "1",
+        ]
+        if self.provider_config.model:
+            cmd.extend(["--model", self.provider_config.model])
+
+        last_error = ""
+        for attempt in range(1, self.max_empty_retries + 1):
+            completed = subprocess.run(
+                cmd,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.provider_config.timeout_seconds,
+            )
+            stdout = (completed.stdout or "").strip()
+            stderr = (completed.stderr or "").strip()
+
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    "Claude Code translation failed. "
+                    f"Exit code: {completed.returncode}. Details: {stderr[-1200:]}"
+                )
+
+            translated_text = self._extract_translation(stdout)
+            if translated_text:
+                return ProviderResult(text=translated_text)
+
+            last_error = (
+                "Claude Code returned an empty translation. "
+                f"Attempt {attempt}/{self.max_empty_retries}. "
+                f"stdout: {stdout[-400:]} stderr: {stderr[-400:]}"
+            )
+
+        raise RuntimeError(last_error or "Claude Code returned an empty translation.")
+
+    @staticmethod
+    def _build_structured_prompt(system_prompt: str, user_prompt: str) -> str:
+        return (
+            f"{system_prompt}\n\n"
+            f"{user_prompt}\n\n"
+            "Return ONLY a JSON object with a single key `translation` containing "
+            "the translated text. Do not return markdown fences, explanations, or "
+            'extra keys. Example: {"translation": "translated text here"}\n'
+            "If the source is difficult, still provide the best possible non-empty translation."
+        )
+
+    @staticmethod
+    def _extract_translation(stdout: str) -> str:
+        if not stdout:
+            return ""
+        # Claude Code --output-format json returns an envelope with a "result" field
+        envelope = _parse_json_payload(stdout)
+        if envelope:
+            if envelope.get("is_error"):
+                return ""
+            result = str(envelope.get("result", "")).strip()
+            if result:
+                # Try to parse result as JSON with "translation" key
+                inner = _parse_json_payload(result)
+                if inner:
+                    translation = str(inner.get("translation", "")).strip()
+                    if translation:
+                        return translation
+                # Fall back to raw result text (strip markdown fences)
+                return _strip_markdown_fences(result)
+            # Direct translation JSON (unlikely but handle it)
+            translation = str(envelope.get("translation", "")).strip()
+            if translation:
+                return translation
+        return ""
+
+
+class GeminiCLIProvider(BaseProvider):
+    """Translation provider using the Gemini CLI (``gemini``)."""
+
+    max_empty_retries = 3
+
+    def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
+        self.provider_config = provider
+        self.translation_config = translation
+        self.gemini_command = shutil.which("gemini")
+        if self.gemini_command is None:
+            raise RuntimeError(
+                "Gemini CLI was not found in PATH. "
+                "Install Gemini CLI (https://github.com/google-gemini/gemini-cli) first."
+            )
+
+    def translate(self, text: str, system_prompt: str, user_prompt: str | None = None) -> ProviderResult:
+        prompt = self._build_structured_prompt(system_prompt, user_prompt or text)
+        cmd = [self.gemini_command]
+        if self.provider_config.model:
+            cmd.extend(["-m", self.provider_config.model])
+        # Pass prompt via stdin to handle long text safely
+        last_error = ""
+        for attempt in range(1, self.max_empty_retries + 1):
+            completed = subprocess.run(
+                cmd,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.provider_config.timeout_seconds,
+            )
+            stdout = (completed.stdout or "").strip()
+            stderr = (completed.stderr or "").strip()
+
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    "Gemini CLI translation failed. "
+                    f"Exit code: {completed.returncode}. Details: {stderr[-1200:]}"
+                )
+
+            translated_text = self._extract_translation(stdout)
+            if translated_text:
+                return ProviderResult(text=translated_text)
+
+            last_error = (
+                "Gemini CLI returned an empty translation. "
+                f"Attempt {attempt}/{self.max_empty_retries}. "
+                f"stdout: {stdout[-400:]} stderr: {stderr[-400:]}"
+            )
+
+        raise RuntimeError(last_error or "Gemini CLI returned an empty translation.")
+
+    @staticmethod
+    def _build_structured_prompt(system_prompt: str, user_prompt: str) -> str:
+        return (
+            f"{system_prompt}\n\n"
+            f"{user_prompt}\n\n"
+            "Return ONLY a JSON object with a single key `translation` containing "
+            "the translated text. Do not return markdown fences, explanations, or "
+            'extra keys. Example: {"translation": "translated text here"}\n'
+            "If the source is difficult, still provide the best possible non-empty translation."
+        )
+
+    @staticmethod
+    def _extract_translation(stdout: str) -> str:
+        if not stdout:
+            return ""
+        # Try to parse as JSON with "translation" key
+        parsed = _parse_json_payload(stdout)
+        if parsed:
+            translation = str(parsed.get("translation", "")).strip()
+            if translation:
+                return translation
+        # Fallback: strip markdown fences and use raw output
+        return _strip_markdown_fences(stdout)
 
 
 def build_provider(provider: ProviderConfig, translation: TranslationConfig) -> BaseProvider:
@@ -243,4 +433,8 @@ def build_provider(provider: ProviderConfig, translation: TranslationConfig) -> 
         return MockProvider(translation)
     if provider.kind == "codex":
         return CodexCLIProvider(provider, translation)
+    if provider.kind == "claude":
+        return ClaudeCodeCLIProvider(provider, translation)
+    if provider.kind == "gemini":
+        return GeminiCLIProvider(provider, translation)
     return OpenAICompatibleProvider(provider, translation)
