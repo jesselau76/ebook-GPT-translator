@@ -69,6 +69,7 @@ def translate_file(
     input_path: Path,
     config: AppConfig,
     progress_callback: ProgressCallback | None = None,
+    force_resume: bool = False,
 ) -> tuple[Document, OutputArtifacts, UsageStats]:
     ensure_runtime_paths(config)
 
@@ -81,7 +82,7 @@ def translate_file(
     memory_path = _memory_path(config, input_path)
     resume_fingerprint = _build_resume_fingerprint(input_path, config)
     try:
-        memory_state = _load_memory_state(memory_path, resume_fingerprint)
+        memory_state = _load_memory_state(memory_path, resume_fingerprint, force=force_resume)
         _translate_document(
             document,
             config,
@@ -93,6 +94,7 @@ def translate_file(
             memory_path,
             resume_fingerprint,
             progress_callback,
+            force_resume=force_resume,
         )
         text_path, epub_path = write_outputs(document, config)
         manifest_path = None
@@ -209,6 +211,7 @@ def _translate_document(
     memory_path: Path,
     resume_fingerprint: str,
     progress_callback: ProgressCallback | None = None,
+    force_resume: bool = False,
 ) -> None:
     system_prompt = _build_system_prompt(config, glossary)
     text_blocks = document.iter_text_blocks()
@@ -290,6 +293,7 @@ def _translate_document(
                 chapter.translated_title or chapter.title,
                 block.role,
                 progress_callback,
+                force_resume=force_resume,
             )
             block.translated_text = translated
             if block.role == "heading" and chapter.title == block.text:
@@ -352,6 +356,7 @@ def _translate_text(
     chapter_title: str,
     block_role: str,
     progress_callback: ProgressCallback | None = None,
+    force_resume: bool = False,
 ) -> str:
     chunks = split_text(
         text=text,
@@ -426,6 +431,36 @@ def _translate_text(
                 ),
             )
             continue
+
+        if force_resume:
+            content_cached = cache.get_by_content(chunk, config.translation.target_language)
+            if content_cached is not None:
+                translated_text, usage = content_cached
+                stats.cache_hits += 1
+                stats.prompt_tokens += usage.get("prompt_tokens", 0)
+                stats.completion_tokens += usage.get("completion_tokens", 0)
+                cache.put(payload, translated_text, usage)
+                translated_parts.append(translated_text)
+                _emit_progress(
+                    progress_callback,
+                    ProgressUpdate(
+                        stage="chunk_finished",
+                        completed_blocks=stats.translated_blocks,
+                        total_blocks=total_blocks,
+                        current_block_index=block_index,
+                        current_chunk_index=chunk_index,
+                        total_chunks=total_chunks,
+                        chapter_title=chapter_title,
+                        block_role=block_role,
+                        message=(
+                            f"Reused previous translation for block {block_index}/{total_blocks}, "
+                            f"chunk {chunk_index}/{total_chunks}."
+                        ),
+                        cache_hits=stats.cache_hits,
+                        api_calls=stats.api_calls,
+                    ),
+                )
+                continue
 
         if config.runtime.dry_run:
             translated_text = _dry_run_text(chunk, config.translation.target_language)
@@ -675,24 +710,20 @@ def _clip_text(text: str, limit: int) -> str:
     return normalized[: limit - 3].rstrip() + "..."
 
 
-def _load_memory_state(memory_path: Path, resume_fingerprint: str) -> dict:
+def _load_memory_state(memory_path: Path, resume_fingerprint: str, force: bool = False) -> dict:
+    empty: dict = {
+        "recent_blocks": [],
+        "chapter_memories": {},
+        "term_memory": {},
+        "completed_blocks": 0,
+        "total_blocks": 0,
+    }
     if not memory_path.exists():
-        return {
-            "recent_blocks": [],
-            "chapter_memories": {},
-            "term_memory": {},
-            "completed_blocks": 0,
-            "total_blocks": 0,
-        }
+        return empty
     data = json.loads(memory_path.read_text(encoding="utf-8"))
-    if str(data.get("resume_fingerprint", "")) != resume_fingerprint:
-        return {
-            "recent_blocks": [],
-            "chapter_memories": {},
-            "term_memory": {},
-            "completed_blocks": 0,
-            "total_blocks": 0,
-        }
+    fingerprint_match = str(data.get("resume_fingerprint", "")) == resume_fingerprint
+    if not fingerprint_match and not force:
+        return empty
     return {
         "recent_blocks": [],
         "chapter_memories": {},

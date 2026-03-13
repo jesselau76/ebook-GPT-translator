@@ -184,6 +184,7 @@ class TranslatorGUI:
         self.epub_only = tk.BooleanVar(value=False)
         self.skip_existing = tk.BooleanVar(value=False)
         self.overwrite = tk.BooleanVar(value=False)
+        self.force_resume = tk.BooleanVar(value=False)
         self.status_text = tk.StringVar(value="Idle")
         self.progress_value = tk.DoubleVar(value=0.0)
         self.progress_detail = tk.StringVar(value="No active translation.")
@@ -319,13 +320,16 @@ class TranslatorGUI:
         resume_box.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         resume_box.columnconfigure(0, weight=1)
         ttk.Label(resume_box, textvariable=self.resume_status, foreground="#4a4a4a", wraplength=760).grid(
-            row=0, column=0, columnspan=2, sticky="w"
+            row=0, column=0, columnspan=3, sticky="w"
         )
         ttk.Button(resume_box, text="Check resume", command=lambda: self._refresh_resume_status(log_message=True)).grid(
             row=1, column=0, sticky="w", pady=(8, 0)
         )
+        ttk.Checkbutton(resume_box, text="Force (ignore param changes)", variable=self.force_resume).grid(
+            row=1, column=1, sticky="w", pady=(8, 0), padx=(8, 0)
+        )
         ttk.Button(resume_box, text="Resume previous job", command=lambda: self._start_translation(resume_only=True)).grid(
-            row=1, column=1, sticky="e", pady=(8, 0)
+            row=1, column=2, sticky="e", pady=(8, 0)
         )
 
         row += 1
@@ -750,14 +754,24 @@ job_dir = ".cache/jobs"
             return
 
         form = self._collect_form()
+        force = self.force_resume.get()
         if resume_only:
             config = build_config_from_form(form)
             status = inspect_resume_state(Path(self.file_path.get()), config)
             message = status.message
-            if not status.available or not status.compatible:
+            if not status.available:
                 messagebox.showinfo("No resumable job", message)
                 self.resume_status.set(message)
                 return
+            if not status.compatible and not force:
+                messagebox.showinfo("No resumable job", message)
+                self.resume_status.set(message)
+                return
+            if not status.compatible and force:
+                message = (
+                    f"Force resume: reusing {status.completed_blocks}/{status.total_blocks or '?'} "
+                    f"previously translated blocks (params changed)."
+                )
             self.resume_status.set(message)
             self._append_log(message)
 
@@ -765,7 +779,7 @@ job_dir = ".cache/jobs"
         self.progress_value.set(0.0)
         self.progress_detail.set("Preparing translation job...")
         self._append_log(f"Starting translation for {self.file_path.get()}")
-        self.worker = threading.Thread(target=self._run_translation, args=(form,), daemon=True)
+        self.worker = threading.Thread(target=self._run_translation, args=(form, force), daemon=True)
         self.worker.start()
 
     def _collect_form(self) -> dict[str, Any]:
@@ -799,13 +813,14 @@ job_dir = ".cache/jobs"
             "overwrite": self.overwrite.get(),
         }
 
-    def _run_translation(self, form: dict[str, Any]) -> None:
+    def _run_translation(self, form: dict[str, Any], force_resume: bool = False) -> None:
         try:
             config = build_config_from_form(form)
             document, artifacts, stats = translate_file(
                 Path(self.file_path.get()),
                 config,
                 progress_callback=lambda event: self.queue.put(("progress", asdict(event))),
+                force_resume=force_resume,
             )
             payload = {
                 "document": document.title,

@@ -54,6 +54,7 @@ def translate(
     epub_only: bool = typer.Option(False, "--epub-only", help="Write only EPUB output."),
     skip_existing: bool = typer.Option(None, "--skip-existing", help="Skip if translated outputs already exist."),
     overwrite: bool = typer.Option(None, "--overwrite", help="Overwrite existing translated outputs."),
+    force_resume: bool = typer.Option(False, "--force-resume", help="Resume translation even if parameters changed, reusing previous translations by content."),
 ) -> None:
     config = load_config(config_path or None, env_file or None)
     overrides = {
@@ -92,7 +93,7 @@ def translate(
         console.print(f"[yellow]Skipping[/yellow] {input_path} because translated outputs already exist.")
         return
 
-    _, artifacts, stats = translate_file(input_path, config)
+    _, artifacts, stats = translate_file(input_path, config, force_resume=force_resume)
     _print_summary(artifacts, stats, config)
 
 

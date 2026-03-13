@@ -28,6 +28,16 @@ class TranslationCache:
             )
             """
         )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS content_translations (
+                content_key TEXT PRIMARY KEY,
+                translated_text TEXT NOT NULL,
+                usage_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
         self.connection.commit()
 
     @staticmethod
@@ -45,21 +55,44 @@ class TranslationCache:
             return None
         return row["translated_text"], json.loads(row["usage_json"])
 
+    def get_by_content(self, chunk: str, target_language: str) -> tuple[str, dict[str, int]] | None:
+        content_key = self._content_key(chunk, target_language)
+        row = self.connection.execute(
+            "SELECT translated_text, usage_json FROM content_translations WHERE content_key = ?",
+            (content_key,),
+        ).fetchone()
+        if row is None:
+            return None
+        return row["translated_text"], json.loads(row["usage_json"])
+
     def put(self, payload: dict[str, str], translated_text: str, usage: dict[str, int]) -> None:
         cache_key = self.build_key(payload)
+        now = datetime.now(timezone.utc).isoformat()
+        usage_json = json.dumps(usage, ensure_ascii=False)
         self.connection.execute(
             """
             INSERT OR REPLACE INTO translations (cache_key, translated_text, usage_json, created_at)
             VALUES (?, ?, ?, ?)
             """,
-            (
-                cache_key,
-                translated_text,
-                json.dumps(usage, ensure_ascii=False),
-                datetime.now(timezone.utc).isoformat(),
-            ),
+            (cache_key, translated_text, usage_json, now),
         )
+        chunk = payload.get("chunk", "")
+        target_language = payload.get("target_language", "")
+        if chunk and target_language:
+            content_key = self._content_key(chunk, target_language)
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO content_translations (content_key, translated_text, usage_json, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (content_key, translated_text, usage_json, now),
+            )
         self.connection.commit()
+
+    @staticmethod
+    def _content_key(chunk: str, target_language: str) -> str:
+        data = f"{chunk}\0{target_language}"
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
     def close(self) -> None:
         self.connection.close()
