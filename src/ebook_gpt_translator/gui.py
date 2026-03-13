@@ -499,10 +499,64 @@ class TranslatorGUI:
         path = filedialog.asksaveasfilename(defaultextension=".toml", filetypes=[("TOML", "*.toml")])
         if not path:
             return
-        from ebook_gpt_translator.cli import TOML_CONFIG_EXAMPLE
+        form = self._collect_form()
+        custom_prompt = form.get("custom_prompt", "")
+        # Escape TOML multiline: use triple-quoted string
+        if "\n" in custom_prompt:
+            prompt_value = f'"""\n{custom_prompt}\n"""'
+        else:
+            prompt_value = f'"{custom_prompt}"'
+        content = f"""[provider]
+# kind: codex, claude, gemini, openai, azure, compatible, or mock
+kind = "{form.get("provider", "codex")}"
+model = "{form.get("model", "gpt-5.2-codex")}"
+reasoning_effort = "{form.get("reasoning_effort", "medium")}"
+api_key = "{form.get("api_key", "")}"
+api_base_url = "{form.get("api_base_url", "")}"
+api_version = "{form.get("api_version", "")}"
+api_mode = "{form.get("api_mode", "auto")}"
+timeout_seconds = 120
+max_retries = 5
+proxy = ""
 
-        Path(path).write_text(TOML_CONFIG_EXAMPLE, encoding="utf-8")
-        self._append_log(f"Saved example config to {path}")
+[translation]
+target_language = "{form.get("target_language", "Simplified Chinese")}"
+bilingual_output = {str(form.get("bilingual", False)).lower()}
+custom_prompt = {prompt_value}
+temperature = 0.2
+max_output_tokens = 0
+preserve_line_breaks = true
+context_window_blocks = {form.get("context_window", 6)}
+
+[chunking]
+max_chars = {form.get("max_chars", 5000)}
+max_tokens = {form.get("max_tokens", 3500)}
+test_limit = {form.get("test_limit", 3)}
+
+[input]
+start_page = {form.get("start_page", 1)}
+end_page = {form.get("end_page", -1)}
+
+[glossary]
+path = "{form.get("glossary_path", "")}"
+case_sensitive = false
+
+[output]
+output_dir = "{form.get("output_dir", "output")}"
+emit_txt = true
+emit_epub = true
+skip_existing = {str(form.get("skip_existing", False)).lower()}
+overwrite = {str(form.get("overwrite", False)).lower()}
+write_manifest = true
+
+[runtime]
+dry_run = false
+test_mode = false
+cache_path = ".cache/translation.sqlite3"
+job_dir = ".cache/jobs"
+"""
+        Path(path).write_text(content, encoding="utf-8")
+        self._append_log(f"Saved config to {path}")
 
     def _open_output_dir(self) -> None:
         output_dir = Path(self.output_dir.get() or "output")
