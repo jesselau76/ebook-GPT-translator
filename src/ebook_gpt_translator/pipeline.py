@@ -234,15 +234,40 @@ def _translate_document(
         for chapter_id, items in memory_state["chapter_memories"].items()
     }
     term_memory: dict[str, dict[str, str | int]] = memory_state["term_memory"]
+    block_translations: dict[str, str] = dict(memory_state.get("block_translations", {}))
     document_term_counts = _scan_document_term_counts(document)
     total_blocks = len(text_blocks)
 
+    # Pre-populate blocks from saved translations (force resume)
+    restored_ids: set[str] = set()
+    if force_resume and block_translations:
+        for chapter, block in text_blocks:
+            saved = block_translations.get(block.block_id)
+            if saved is None:
+                break  # stop at first untranslated block
+            block.translated_text = saved
+            restored_ids.add(block.block_id)
+            if block.role == "heading" and chapter.title == block.text:
+                chapter.translated_title = saved
+            elif block.heading_text and chapter.title == block.heading_text:
+                chapter.translated_title = saved.split("\n\n", 1)[0].strip()
+            # Build up context for subsequent blocks
+            source_text = glossary.apply(block.text)
+            recent_blocks.append((source_text, saved))
+            chapter_memory = chapter_memories.setdefault(chapter.chapter_id, deque(maxlen=8))
+            chapter_memory.append(saved)
+
+    skipped = len(restored_ids)
     _emit_progress(
         progress_callback,
         ProgressUpdate(
             stage="start",
             total_blocks=total_blocks,
-            message=f"Loaded {total_blocks} text blocks from {document.title or document.source_path.name}.",
+            completed_blocks=skipped,
+            message=(
+                f"Loaded {total_blocks} text blocks from {document.title or document.source_path.name}."
+                + (f" Restored {skipped} previously translated blocks." if skipped else "")
+            ),
         ),
     )
 
@@ -254,8 +279,11 @@ def _translate_document(
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task("Translating", total=total_blocks or 1)
+        task = progress.add_task("Translating", total=total_blocks or 1, completed=skipped)
+        stats.translated_blocks = skipped
         for block_index, (chapter, block) in enumerate(text_blocks, start=1):
+            if block.block_id in restored_ids:
+                continue
             source_text = glossary.apply(block.text)
             block_terms = _extract_candidate_terms(source_text, document_term_counts)
             chapter_memory = chapter_memories.setdefault(chapter.chapter_id, deque(maxlen=8))
@@ -296,6 +324,7 @@ def _translate_document(
                 force_resume=force_resume,
             )
             block.translated_text = translated
+            block_translations[block.block_id] = translated
             if block.role == "heading" and chapter.title == block.text:
                 chapter.translated_title = translated
             elif block.heading_text and chapter.title == block.heading_text:
@@ -312,6 +341,7 @@ def _translate_document(
                 stats.translated_blocks + 1,
                 total_blocks,
                 resume_fingerprint,
+                block_translations,
             )
             stats.translated_blocks += 1
             progress.advance(task)
@@ -717,6 +747,7 @@ def _load_memory_state(memory_path: Path, resume_fingerprint: str, force: bool =
         "term_memory": {},
         "completed_blocks": 0,
         "total_blocks": 0,
+        "block_translations": {},
     }
     if not memory_path.exists():
         return empty
@@ -730,6 +761,7 @@ def _load_memory_state(memory_path: Path, resume_fingerprint: str, force: bool =
         "term_memory": {},
         "completed_blocks": int(data.get("completed_blocks", 0) or 0),
         "total_blocks": int(data.get("total_blocks", 0) or 0),
+        "block_translations": data.get("block_translations", {}),
     }
 
 
@@ -741,6 +773,7 @@ def _save_memory_state(
     completed_blocks: int,
     total_blocks: int,
     resume_fingerprint: str,
+    block_translations: dict[str, str] | None = None,
 ) -> None:
     payload = {
         "recent_blocks": list(recent_blocks),
@@ -752,6 +785,7 @@ def _save_memory_state(
         "completed_blocks": completed_blocks,
         "total_blocks": total_blocks,
         "resume_fingerprint": resume_fingerprint,
+        "block_translations": block_translations or {},
     }
     memory_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
