@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -394,9 +396,12 @@ class GeminiCLIProvider(BaseProvider):
 
     max_empty_retries = 3
 
+    _log = logging.getLogger("ebook_gpt_translator.gemini")
+
     def __init__(self, provider: ProviderConfig, translation: TranslationConfig) -> None:
         self.provider_config = provider
         self.translation_config = translation
+        self.max_retries = provider.max_retries or 5
         self.gemini_command = shutil.which("gemini")
         if self.gemini_command is None:
             raise RuntimeError(
@@ -408,8 +413,7 @@ class GeminiCLIProvider(BaseProvider):
         prompt = self._build_structured_prompt(system_prompt, user_prompt or text)
         cmd = [
             self.gemini_command,
-            "-p",
-            prompt,
+            "-p", "",
             "-o",
             "json",
         ]
@@ -417,34 +421,58 @@ class GeminiCLIProvider(BaseProvider):
             cmd.extend(["-m", self.provider_config.model])
 
         last_error = ""
-        for attempt in range(1, self.max_empty_retries + 1):
-            completed = subprocess.run(
-                cmd,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=self.provider_config.timeout_seconds,
-            )
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                completed = subprocess.run(
+                    cmd,
+                    input=prompt,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=self.provider_config.timeout_seconds,
+                )
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                last_error = f"Gemini CLI error: {exc} (attempt {attempt}/{self.max_retries})"
+                self._log.warning(last_error)
+                if attempt < self.max_retries:
+                    self._backoff(attempt)
+                continue
+
             stdout = (completed.stdout or "").strip()
             stderr = (completed.stderr or "").strip()
 
             if completed.returncode != 0:
-                raise RuntimeError(
-                    "Gemini CLI translation failed. "
-                    f"Exit code: {completed.returncode}. Details: {stderr[-1200:]}"
+                last_error = (
+                    f"Gemini CLI failed (exit {completed.returncode}, "
+                    f"attempt {attempt}/{self.max_retries}): {stderr[-800:]}"
                 )
+                self._log.warning(last_error)
+                if attempt < self.max_retries:
+                    self._backoff(attempt)
+                continue
 
             translated_text = self._extract_translation(stdout)
             if translated_text:
                 return ProviderResult(text=translated_text)
 
             last_error = (
-                "Gemini CLI returned an empty translation. "
-                f"Attempt {attempt}/{self.max_empty_retries}. "
+                "Gemini CLI returned an empty translation "
+                f"(attempt {attempt}/{self.max_retries}). "
                 f"stdout: {stdout[-400:]} stderr: {stderr[-400:]}"
             )
+            self._log.warning(last_error)
+            if attempt < self.max_retries:
+                self._backoff(attempt)
 
         raise RuntimeError(last_error or "Gemini CLI returned an empty translation.")
+
+    @staticmethod
+    def _backoff(attempt: int) -> None:
+        delay = min(2 ** attempt, 60)
+        logging.getLogger("ebook_gpt_translator.gemini").info(
+            "Retrying in %ds...", delay
+        )
+        time.sleep(delay)
 
     @staticmethod
     def _build_structured_prompt(system_prompt: str, user_prompt: str) -> str:

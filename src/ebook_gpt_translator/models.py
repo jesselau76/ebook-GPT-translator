@@ -62,6 +62,7 @@ class UsageStats:
     cache_hits: int = 0
     api_calls: int = 0
     translated_blocks: int = 0
+    failed_blocks: int = 0
 
 
 @dataclass(slots=True)

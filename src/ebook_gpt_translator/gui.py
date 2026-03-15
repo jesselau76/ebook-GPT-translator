@@ -875,7 +875,7 @@ job_dir = ".cache/jobs"
 
         if total_blocks > 0:
             percent = (completed_blocks / total_blocks) * 100
-            if stage in {"block_started", "chunk_started", "chunk_finished"} and current_block_index:
+            if stage in {"block_started", "chunk_started", "chunk_finished", "chunk_failed"} and current_block_index:
                 block_base = (current_block_index - 1) / total_blocks
                 chunk_fraction = 0.0
                 if total_chunks > 0:
@@ -901,7 +901,7 @@ job_dir = ".cache/jobs"
             detail_parts.append(message)
         self.progress_detail.set(" | ".join(detail_parts))
 
-        if stage in {"start", "block_started", "block_finished", "done"} and message:
+        if stage in {"start", "block_started", "block_finished", "chunk_failed", "done"} and message:
             self._append_log(message)
 
     def _append_log(self, message: str) -> None:

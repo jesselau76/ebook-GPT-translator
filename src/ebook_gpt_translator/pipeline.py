@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import hashlib
+import subprocess
 from collections import deque
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -29,6 +31,7 @@ from ebook_gpt_translator.providers import BaseProvider, build_provider
 
 
 console = Console()
+_pipeline_log = logging.getLogger("ebook_gpt_translator.pipeline")
 ProgressCallback = Callable[[ProgressUpdate], None]
 _TERM_STOPWORDS = {
     "The",
@@ -323,6 +326,11 @@ def _translate_document(
                 progress_callback,
                 force_resume=force_resume,
             )
+            if not translated:
+                # All chunks for this block failed; leave untranslated so
+                # force_resume can retry it later.
+                progress.advance(task)
+                continue
             block.translated_text = translated
             block_translations[block.block_id] = translated
             if block.role == "heading" and chapter.title == block.text:
@@ -366,7 +374,10 @@ def _translate_document(
             stage="done",
             completed_blocks=stats.translated_blocks,
             total_blocks=total_blocks,
-            message=f"Translated {stats.translated_blocks}/{total_blocks} blocks.",
+            message=(
+                f"Translated {stats.translated_blocks}/{total_blocks} blocks."
+                + (f" ({stats.failed_blocks} failed, kept original text)" if stats.failed_blocks else "")
+            ),
             cache_hits=stats.cache_hits,
             api_calls=stats.api_calls,
         ),
@@ -496,7 +507,34 @@ def _translate_text(
             translated_text = _dry_run_text(chunk, config.translation.target_language)
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
         else:
-            result = provider.translate(chunk, system_prompt, user_prompt)
+            try:
+                result = provider.translate(chunk, system_prompt, user_prompt)
+            except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+                _pipeline_log.warning(
+                    "Translation failed for block %d/%d chunk %d/%d, skipping: %s",
+                    block_index, total_blocks, chunk_index, total_chunks, exc,
+                )
+                stats.failed_blocks += 1
+                _emit_progress(
+                    progress_callback,
+                    ProgressUpdate(
+                        stage="chunk_failed",
+                        completed_blocks=stats.translated_blocks,
+                        total_blocks=total_blocks,
+                        current_block_index=block_index,
+                        current_chunk_index=chunk_index,
+                        total_chunks=total_chunks,
+                        chapter_title=chapter_title,
+                        block_role=block_role,
+                        message=(
+                            f"FAILED block {block_index}/{total_blocks}, "
+                            f"chunk {chunk_index}/{total_chunks}: {exc}"
+                        ),
+                        cache_hits=stats.cache_hits,
+                        api_calls=stats.api_calls,
+                    ),
+                )
+                continue
             translated_text = result.text
             usage = {
                 "prompt_tokens": result.prompt_tokens,

@@ -35,7 +35,14 @@ def load_document(path: Path, config: AppConfig) -> Document:
 
 
 def _load_text_document(path: Path) -> Document:
-    text = path.read_text(encoding="utf-8")
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        import chardet
+        detected = chardet.detect(raw)
+        encoding = detected.get("encoding") or "utf-8"
+        text = raw.decode(encoding)
     blocks = []
     for index, paragraph in enumerate(_split_paragraphs(text), start=1):
         role = "heading" if index == 1 else "paragraph"
